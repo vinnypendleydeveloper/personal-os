@@ -5,77 +5,55 @@ import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 
 const TABS = [
-  { label: 'Home', href: '/' },
+  { label: 'HOME', href: '/' },
   { label: 'CRM', href: '/crm' },
-  { label: 'Finance', href: '/finance' },
-  { label: 'Review', href: '/review' },
-  { label: 'Brain', href: '/brain' },
-  { label: 'Health', href: '/health' },
+  { label: 'FINANCE', href: '/finance' },
+  { label: 'REVIEW', href: '/review' },
+  { label: 'BRAIN', href: '/brain' },
+  { label: 'HEALTH', href: '/health' },
 ]
 
-interface TickerItem {
-  label: string
-  value: string
-  change?: string
-  up?: boolean
-}
+interface TickerItem { label: string; value: string; change?: string; up?: boolean | null }
 
-function useTicker() {
-  const [tickers, setTickers] = useState<TickerItem[]>([
-    { label: 'BTC', value: '—' },
-    { label: 'NDX', value: '—' },
-    { label: 'XAU', value: '—' },
+function useLivePrices() {
+  const [prices, setPrices] = useState<TickerItem[]>([
+    { label: 'BTC', value: '—', change: undefined },
+    { label: 'NDX', value: '—', change: undefined },
+    { label: 'XAU', value: '—', change: undefined },
   ])
 
   useEffect(() => {
-    async function fetchPrices() {
+    async function fetch_btc() {
       try {
-        const res = await fetch(
-          'https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD,^NDX,GC=F?interval=1d&range=2d',
-          { cache: 'no-store' }
-        )
-        // Yahoo Finance blocks CORS — use a simple free API instead
-        const [btc, ndx, gold] = await Promise.allSettled([
-          fetch('https://api.coinbase.com/v2/prices/BTC-USD/spot').then(r => r.json()),
-          Promise.resolve(null),
-          Promise.resolve(null),
-        ])
-
-        const items: TickerItem[] = []
-
-        if (btc.status === 'fulfilled' && btc.value?.data?.amount) {
-          const price = parseFloat(btc.value.data.amount)
-          items.push({ label: 'BTC', value: `$${Math.round(price).toLocaleString()}` })
-        } else {
-          items.push({ label: 'BTC', value: '—' })
+        const r = await fetch('https://api.coinbase.com/v2/prices/BTC-USD/spot')
+        const j = await r.json()
+        const price = parseFloat(j?.data?.amount ?? '0')
+        if (price > 0) {
+          setPrices(prev => prev.map(p => p.label === 'BTC'
+            ? { ...p, value: `$${Math.round(price).toLocaleString()}` }
+            : p))
         }
-        items.push({ label: 'NDX', value: '—' })
-        items.push({ label: 'XAU', value: '—' })
-
-        setTickers(items)
-      } catch {
-        // Keep defaults
-      }
+      } catch {}
     }
-    fetchPrices()
-    const id = setInterval(fetchPrices, 60_000)
+    fetch_btc()
+    const id = setInterval(fetch_btc, 30_000)
     return () => clearInterval(id)
   }, [])
 
-  return tickers
+  return prices
 }
 
 export function TopRail() {
   const pathname = usePathname()
-  const tickers = useTicker()
+  const prices = useLivePrices()
   const [time, setTime] = useState('')
-  const [date, setDate] = useState('')
+  const [dateStr, setDateStr] = useState('')
 
   useEffect(() => {
     function tick() {
       const now = new Date()
-      setTime(now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }))
-      setDate(now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase())
+      setTime(now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }))
+      setDateStr(now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase())
     }
     tick()
     const id = setInterval(tick, 1000)
@@ -87,52 +65,86 @@ export function TopRail() {
     window.location.href = '/login'
   }
 
+  // Ticker items repeated for seamless loop
+  const tickerItems = [...prices, ...prices]
+
   return (
     <header
-      className="sticky top-0 z-50 border-b"
+      className="sticky top-0 z-50"
       style={{
-        background: 'oklch(0.12 0.006 260 / 0.95)',
-        backdropFilter: 'blur(12px)',
-        borderColor: 'oklch(1 0 0 / 0.07)',
+        background: 'oklch(0.10 0.008 255 / 0.96)',
+        backdropFilter: 'blur(16px)',
+        borderBottom: '1px solid var(--border)',
       }}
     >
-      {/* Main rail */}
-      <div className="flex items-center justify-between px-5 h-11">
+      {/* Main navigation rail */}
+      <div className="flex items-center justify-between px-4 h-10">
         {/* Brand */}
-        <span className="font-mono font-bold text-xs tracking-widest" style={{ color: 'var(--accent)' }}>
-          PERSONAL OS
-        </span>
+        <div className="flex items-center gap-2">
+          <span
+            className="text-[11px] font-semibold tracking-[0.2em]"
+            style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}
+          >
+            PERSONAL OS
+          </span>
+          <span className="text-[10px] dot-online" style={{ fontFamily: 'var(--font-mono)', color: 'var(--ok)' }}>●</span>
+        </div>
 
-        {/* Tabs */}
+        {/* Nav tabs */}
         <nav className="flex items-center gap-0.5">
-          {TABS.map(tab => {
+          {TABS.map((tab, i) => {
             const active = tab.href === '/' ? pathname === '/' : pathname.startsWith(tab.href)
             return (
               <Link
                 key={tab.href}
                 href={tab.href}
-                className="px-3 py-1 rounded-md text-[11px] font-mono font-medium transition-colors"
+                className="relative px-3 py-1 rounded text-[10px] font-medium tracking-wider transition-all duration-150 group"
                 style={{
+                  fontFamily: 'var(--font-mono)',
                   background: active ? 'var(--accent-dim)' : 'transparent',
-                  color: active ? 'var(--accent)' : 'var(--ink-4)',
+                  color: active ? 'var(--accent)' : 'var(--fg-3)',
+                  animationDelay: `${i * 40}ms`,
                 }}
               >
-                {tab.label.toUpperCase()}
+                {active && (
+                  <span
+                    className="absolute inset-x-3 bottom-0 h-px"
+                    style={{ background: 'var(--accent)', opacity: 0.6 }}
+                  />
+                )}
+                <span className="group-hover:text-[var(--fg)] transition-colors duration-150">
+                  {tab.label}
+                </span>
               </Link>
             )
           })}
         </nav>
 
-        {/* Clock + logout */}
+        {/* Clock + avatar */}
         <div className="flex items-center gap-3">
-          <div className="text-right hidden sm:block">
-            <div className="font-mono text-xs font-bold" style={{ color: 'var(--foreground)' }}>{time}</div>
-            <div className="font-mono text-[10px]" style={{ color: 'var(--ink-4)' }}>{date}</div>
+          <div className="text-right">
+            <div
+              className="text-xs font-semibold tabular-nums"
+              style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg)', letterSpacing: '0.05em' }}
+            >
+              {time}
+            </div>
+            <div
+              className="text-[9px]"
+              style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-3)' }}
+            >
+              {dateStr}
+            </div>
           </div>
           <button
             onClick={handleLogout}
-            className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-opacity hover:opacity-70"
-            style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}
+            className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold transition-all duration-150 hover:scale-110 active:scale-95"
+            style={{
+              fontFamily: 'var(--font-mono)',
+              background: 'var(--accent-dim)',
+              color: 'var(--accent)',
+              border: '1px solid var(--accent-glow)',
+            }}
             title="Sign out"
           >
             V
@@ -140,22 +152,44 @@ export function TopRail() {
         </div>
       </div>
 
-      {/* Ticker sub-rail */}
+      {/* Ticker rail */}
       <div
-        className="flex items-center gap-4 px-5 h-6 overflow-x-auto"
-        style={{ borderTop: '1px solid oklch(1 0 0 / 0.04)' }}
+        className="relative overflow-hidden h-5 flex items-center"
+        style={{ borderTop: '1px solid var(--border)' }}
       >
-        {tickers.map(t => (
-          <span key={t.label} className="flex items-center gap-1.5 shrink-0">
-            <span className="font-mono text-[10px] font-semibold" style={{ color: 'var(--ink-4)' }}>{t.label}</span>
-            <span className="font-mono text-[10px]" style={{ color: t.value === '—' ? 'var(--ink-3)' : 'var(--foreground)' }}>
-              {t.value}
+        {/* Fade edges */}
+        <div className="absolute left-0 top-0 bottom-0 w-12 z-10 pointer-events-none"
+          style={{ background: 'linear-gradient(90deg, oklch(0.10 0.008 255), transparent)' }} />
+        <div className="absolute right-0 top-0 bottom-0 w-12 z-10 pointer-events-none"
+          style={{ background: 'linear-gradient(270deg, oklch(0.10 0.008 255), transparent)' }} />
+
+        <div className="ticker-track px-4">
+          {tickerItems.map((item, i) => (
+            <span key={i} className="flex items-center gap-3 mr-8">
+              <span
+                className="text-[10px] font-semibold tracking-widest"
+                style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-3)' }}
+              >
+                {item.label}
+              </span>
+              <span
+                className="text-[10px] tabular-nums"
+                style={{ fontFamily: 'var(--font-mono)', color: item.value === '—' ? 'var(--fg-4)' : 'var(--fg)' }}
+              >
+                {item.value}
+              </span>
+              {item.change && (
+                <span
+                  className="text-[10px]"
+                  style={{ fontFamily: 'var(--font-mono)', color: item.up ? 'var(--ok)' : 'var(--hot)' }}
+                >
+                  {item.change}
+                </span>
+              )}
+              <span style={{ color: 'var(--fg-4)', fontSize: '10px' }}>·</span>
             </span>
-          </span>
-        ))}
-        <span className="font-mono text-[10px] ml-auto shrink-0" style={{ color: 'var(--ink-3)' }}>
-          {date} {time}
-        </span>
+          ))}
+        </div>
       </div>
     </header>
   )

@@ -20,81 +20,99 @@ function localDateKey() {
 export function HabitsCard() {
   const today = localDateKey()
   const storageKey = `pos-habits-${today}`
-
   const [done, setDone] = useState<string[]>([])
   const [syncing, setSyncing] = useState(false)
+  const [popping, setPopping] = useState<string | null>(null)
 
   useEffect(() => {
-    // Load from localStorage first (instant)
     try {
       const cached = localStorage.getItem(storageKey)
       if (cached) setDone(JSON.parse(cached))
     } catch {}
-
-    // Then sync from server
-    fetch(`/api/habits?days=1`)
+    fetch('/api/habits?days=1')
       .then(r => r.json())
       .then(data => {
         const serverDone = data.habits?.[today]?.done ?? []
         setDone(serverDone)
         localStorage.setItem(storageKey, JSON.stringify(serverDone))
-      })
-      .catch(() => {})
+      }).catch(() => {})
   }, [today, storageKey])
 
   function toggle(habit: string) {
-    const next = done.includes(habit)
-      ? done.filter(h => h !== habit)
-      : [...done, habit]
-
+    const next = done.includes(habit) ? done.filter(h => h !== habit) : [...done, habit]
     setDone(next)
     localStorage.setItem(storageKey, JSON.stringify(next))
-
+    setPopping(habit)
+    setTimeout(() => setPopping(null), 300)
     setSyncing(true)
     fetch(`/api/habits/${today}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ done: next }),
-    })
-      .catch(console.error)
-      .finally(() => setSyncing(false))
+    }).catch(console.error).finally(() => setSyncing(false))
   }
 
-  const pct = Math.round((done.length / DEFAULT_HABITS.length) * 100)
+  const count = done.length
+  const total = DEFAULT_HABITS.length
+  const pct = Math.round((count / total) * 100)
+  const allDone = count === total
 
   return (
-    <Panel index={3} title={`Habits · ${done.length}/${DEFAULT_HABITS.length}`} action={
-      syncing ? <span className="text-[10px] font-mono" style={{ color: 'var(--ink-4)' }}>saving…</span> : null
+    <Panel index={3} title={`Habits · ${count}/${total}`} delay={120} action={
+      syncing
+        ? <span className="card-label" style={{ color: 'var(--fg-4)' }}>saving</span>
+        : allDone
+        ? <span className="card-label dot-online" style={{ color: 'var(--ok)' }}>COMPLETE ●</span>
+        : null
     }>
       {/* Progress bar */}
-      <div className="h-1 rounded-full overflow-hidden" style={{ background: 'var(--ink-2)' }}>
+      <div className="relative h-1 rounded-full overflow-hidden" style={{ background: 'var(--bg-3)' }}>
         <div
-          className="h-full rounded-full transition-all duration-300"
-          style={{ width: `${pct}%`, background: pct === 100 ? 'var(--ok)' : 'var(--accent)' }}
+          className="h-full rounded-full transition-all duration-500 ease-out"
+          style={{
+            width: `${pct}%`,
+            background: allDone
+              ? 'linear-gradient(90deg, var(--ok), oklch(0.82 0.16 148))'
+              : 'linear-gradient(90deg, var(--accent), oklch(0.74 0.22 270))',
+            boxShadow: pct > 0 ? `0 0 8px ${allDone ? 'var(--ok)' : 'var(--accent)'}` : 'none',
+          }}
         />
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        {DEFAULT_HABITS.map(habit => {
+      {/* Habit list */}
+      <div className="flex flex-col gap-1">
+        {DEFAULT_HABITS.map((habit, i) => {
           const checked = done.includes(habit)
+          const isPopping = popping === habit
           return (
             <button
               key={habit}
               onClick={() => toggle(habit)}
-              className="flex items-center gap-2 text-left group"
+              className="flex items-center gap-2.5 text-left w-full group py-0.5 transition-opacity duration-150"
+              style={{ animationDelay: `${i * 30}ms` }}
             >
+              {/* Checkbox */}
               <div
-                className="w-4 h-4 rounded shrink-0 border flex items-center justify-center transition-colors"
+                className={`w-4 h-4 rounded shrink-0 border flex items-center justify-center transition-all duration-200 ${isPopping ? 'checkbox-pop' : ''}`}
                 style={{
                   background: checked ? 'var(--ok)' : 'transparent',
-                  borderColor: checked ? 'var(--ok)' : 'oklch(1 0 0 / 0.2)',
+                  borderColor: checked ? 'var(--ok)' : 'var(--bg-3)',
+                  boxShadow: checked ? '0 0 6px var(--ok-dim)' : 'none',
                 }}
               >
-                {checked && <span className="text-[10px] text-black">✓</span>}
+                {checked && (
+                  <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
+                    <path d="M1 3L3 5L7 1" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
               </div>
               <span
-                className="text-xs transition-colors"
-                style={{ color: checked ? 'var(--ink-4)' : 'var(--foreground)', textDecoration: checked ? 'line-through' : 'none' }}
+                className="text-xs transition-all duration-200"
+                style={{
+                  color: checked ? 'var(--fg-3)' : 'var(--fg-2)',
+                  textDecoration: checked ? 'line-through' : 'none',
+                  textDecorationColor: 'var(--fg-4)',
+                }}
               >
                 {habit}
               </span>
