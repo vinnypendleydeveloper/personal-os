@@ -5,6 +5,7 @@ import { Shell } from '@/components/dashboard/Shell'
 import { Panel } from '@/components/dashboard/Panel'
 
 type Urgency = 'today' | 'this_week' | 'this_month' | 'someday'
+type DisplayTier = 'overdue' | 'today' | 'this_week' | 'this_month' | 'someday'
 type View = 'kanban' | 'smart'
 
 interface Task {
@@ -20,7 +21,8 @@ interface Task {
   completed_at: string | null
 }
 
-const TIERS: { key: Urgency; label: string; color: string }[] = [
+const TIERS: { key: DisplayTier; label: string; color: string }[] = [
+  { key: 'overdue',    label: 'Overdue',    color: 'oklch(0.55 0.22 20)' },
   { key: 'today',      label: 'Today',      color: 'var(--danger)' },
   { key: 'this_week',  label: 'This Week',  color: 'var(--warn)' },
   { key: 'this_month', label: 'This Month', color: 'var(--accent)' },
@@ -32,6 +34,11 @@ const URGENCY_LABELS: Record<Urgency, string> = {
   this_week: 'This Week',
   this_month: 'This Month',
   someday: 'Someday',
+}
+
+function isOverdue(task: Task) {
+  if (!task.due_date) return false
+  return new Date(task.due_date) < new Date(new Date().toDateString())
 }
 
 export default function CRMPage() {
@@ -160,8 +167,10 @@ export default function CRMPage() {
     setSmartLoading(false)
   }
 
-  const byUrgency = (urgency: Urgency) =>
-    tasks.filter(t => t.urgency === urgency).sort((a, b) => b.priority_score - a.priority_score)
+  const byTier = (tier: DisplayTier) => {
+    if (tier === 'overdue') return tasks.filter(t => isOverdue(t)).sort((a, b) => b.priority_score - a.priority_score)
+    return tasks.filter(t => t.urgency === tier && !isOverdue(t)).sort((a, b) => b.priority_score - a.priority_score)
+  }
 
   const smartResults = smartIds
     ? smartIds.map(id => tasks.find(t => t.id === id)).filter(Boolean) as Task[]
@@ -220,7 +229,7 @@ export default function CRMPage() {
 
           {/* Views */}
           {view === 'kanban' && (
-            <div className="grid grid-cols-4 gap-3 flex-1 overflow-hidden">
+            <div className="grid grid-cols-5 gap-3 flex-1 overflow-hidden">
               {TIERS.map(tier => (
                 <div key={tier.key} className="flex flex-col gap-2 overflow-hidden">
                   {/* Tier header */}
@@ -230,7 +239,7 @@ export default function CRMPage() {
                       {tier.label}
                     </span>
                     <span className="text-[10px] font-mono ml-auto" style={{ color: 'var(--ink-4)' }}>
-                      {byUrgency(tier.key).length}
+                      {byTier(tier.key).length}
                     </span>
                   </div>
 
@@ -238,7 +247,7 @@ export default function CRMPage() {
                   <div className="flex flex-col gap-2 overflow-y-auto flex-1 pr-1">
                     {loading ? (
                       <div className="text-xs" style={{ color: 'var(--ink-4)' }}>Loading…</div>
-                    ) : byUrgency(tier.key).map(task => (
+                    ) : byTier(tier.key).map(task => (
                       <TaskCard key={task.id} task={task} tierColor={tier.color}
                         onClick={() => openDrawer(task)}
                         onComplete={() => completeTask(task.id)}
@@ -315,8 +324,8 @@ export default function CRMPage() {
               <div className="flex flex-col gap-2">
                 <label className="text-[10px] font-mono uppercase tracking-widest" style={{ color: 'var(--ink-4)' }}>Urgency</label>
                 <div className="grid grid-cols-2 gap-1">
-                  {TIERS.map(t => (
-                    <button key={t.key} onClick={() => setEditUrgency(t.key)}
+                  {TIERS.filter(t => t.key !== 'overdue').map(t => (
+                    <button key={t.key} onClick={() => setEditUrgency(t.key as Urgency)}
                       className="text-xs py-1 rounded transition-colors"
                       style={{
                         background: editUrgency === t.key ? `${t.color}22` : 'var(--ink-2)',

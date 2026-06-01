@@ -28,7 +28,7 @@ export function SessionCard() {
   }, [])
 
   return (
-    <Panel title="Session" action={
+    <Panel index={2} title="Session" action={
       <Link href="/crm" className="text-[10px] font-mono" style={{ color: 'var(--accent)' }}>
         View all →
       </Link>

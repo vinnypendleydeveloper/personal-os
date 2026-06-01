@@ -63,7 +63,7 @@ export function HabitsCard() {
   const pct = Math.round((done.length / DEFAULT_HABITS.length) * 100)
 
   return (
-    <Panel title={`Habits · ${done.length}/${DEFAULT_HABITS.length}`} action={
+    <Panel index={3} title={`Habits · ${done.length}/${DEFAULT_HABITS.length}`} action={
       syncing ? <span className="text-[10px] font-mono" style={{ color: 'var(--ink-4)' }}>saving…</span> : null
     }>
       {/* Progress bar */}

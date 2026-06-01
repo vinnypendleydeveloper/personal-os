@@ -46,7 +46,7 @@ export function CalendarCard() {
   const today = new Date()
 
   return (
-    <Panel title="Calendar">
+    <Panel index={4} title="Calendar">
       {/* 14-day strip */}
       <div className="flex gap-1 overflow-x-auto pb-1">
         {days.map(day => {

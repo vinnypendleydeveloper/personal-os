@@ -120,7 +120,7 @@ export function NutritionCard() {
   }), { kcal: 0, p: 0, c: 0, f: 0 })
 
   return (
-    <Panel title="Nutrition">
+    <Panel index={8} title="Nutrition">
       {/* Totals bar */}
       {meals.length > 0 && (
         <div className="grid grid-cols-4 gap-1 text-center">

@@ -3,6 +3,7 @@ import { OperatorCard } from '@/components/dashboard/OperatorCard'
 import { SessionCard } from '@/components/dashboard/SessionCard'
 import { HabitsCard } from '@/components/dashboard/HabitsCard'
 import { GoalsCard } from '@/components/dashboard/GoalsCard'
+import { BlockersCard } from '@/components/dashboard/BlockersCard'
 import { NutritionCard } from '@/components/dashboard/NutritionCard'
 import { FinanceCard } from '@/components/dashboard/FinanceCard'
 import { CalendarCard } from '@/components/dashboard/CalendarCard'
@@ -16,19 +17,15 @@ export default function HomePage() {
         {/* Left column */}
         <div className="flex flex-col gap-4">
           <OperatorCard />
+          <BlockersCard />
           <CalendarCard />
-          <GoalsCard />
         </div>
 
         {/* Centre column */}
         <div className="flex flex-col gap-4">
           <SessionCard />
           <HabitsCard />
-          <div className="panel p-4 flex items-center justify-center min-h-[160px]">
-            <a href="/crm" className="text-xs font-mono" style={{ color: 'var(--accent)' }}>
-              Open CRM →
-            </a>
-          </div>
+          <GoalsCard />
         </div>
 
         {/* Right column */}

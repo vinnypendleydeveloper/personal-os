@@ -77,7 +77,7 @@ export function GoalsCard() {
   }
 
   return (
-    <Panel title="Goals">
+    <Panel index={5} title="Goals">
       {loading ? (
         <div className="text-xs" style={{ color: 'var(--ink-4)' }}>Loading…</div>
       ) : (
