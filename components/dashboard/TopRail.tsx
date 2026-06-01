@@ -52,7 +52,7 @@ export function TopRail() {
   useEffect(() => {
     function tick() {
       const now = new Date()
-      setTime(now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }))
+      setTime(now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }))
       setDateStr(now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase())
     }
     tick()
@@ -138,16 +138,17 @@ export function TopRail() {
           </div>
           <button
             onClick={handleLogout}
-            className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold transition-all duration-150 hover:scale-110 active:scale-95"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold transition-all duration-150 hover:scale-110 active:scale-95 overflow-hidden"
             style={{
               fontFamily: 'var(--font-mono)',
-              background: 'var(--accent-dim)',
-              color: 'var(--accent)',
+              background: 'linear-gradient(135deg, var(--accent-dim), oklch(0.74 0.17 148 / 0.15))',
+              color: 'var(--fg)',
               border: '1px solid var(--accent-glow)',
+              letterSpacing: '0.05em',
             }}
             title="Sign out"
           >
-            V
+            VP
           </button>
         </div>
       </div>
