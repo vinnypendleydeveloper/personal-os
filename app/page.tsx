@@ -7,6 +7,7 @@ import { BlockersCard } from '@/components/dashboard/BlockersCard'
 import { NutritionCard } from '@/components/dashboard/NutritionCard'
 import { FinanceCard } from '@/components/dashboard/FinanceCard'
 import { CalendarCard } from '@/components/dashboard/CalendarCard'
+import { WhoopCard } from '@/components/dashboard/WhoopCard'
 import { CaptureBox } from '@/components/dashboard/CaptureBox'
 
 export default function HomePage() {
@@ -30,6 +31,7 @@ export default function HomePage() {
 
         {/* Right column */}
         <div className="flex flex-col gap-4">
+          <WhoopCard />
           <NutritionCard />
           <FinanceCard />
         </div>

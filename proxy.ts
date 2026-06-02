@@ -5,7 +5,7 @@ const COOKIE_NAME = 'pos-session'
 const secret = new TextEncoder().encode(process.env.AUTH_SECRET!)
 
 const PUBLIC_PATHS = ['/login', '/api/auth']
-const WEBHOOK_PATHS = ['/api/telegram']
+const WEBHOOK_PATHS = ['/api/telegram', '/api/whoop/callback']
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
