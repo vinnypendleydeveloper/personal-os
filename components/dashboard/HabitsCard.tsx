@@ -4,12 +4,12 @@ import { useEffect, useState } from 'react'
 import { Panel } from './Panel'
 
 const DEFAULT_HABITS = [
-  'Morning workout',
-  'Read 30 min',
+  'Hit the gym',
+  'Eat clean + calorie surplus',
   'No social media before noon',
-  'Cold shower',
-  'Review goals',
-  'In bed by midnight',
+  'Work on business / clients',
+  'Wake up early (before 8am)',
+  'Review North Star goals',
 ]
 
 function localDateKey() {

@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 
@@ -41,6 +42,38 @@ function useLivePrices() {
   }, [])
 
   return prices
+}
+
+const AVATAR_SRC = '/avatar.jpg'
+
+function AvatarButton({ onClick }: { onClick: () => void }) {
+  const [hasPhoto, setHasPhoto] = useState(false)
+
+  useEffect(() => {
+    const img = new window.Image()
+    img.onload = () => setHasPhoto(true)
+    img.onerror = () => setHasPhoto(false)
+    img.src = AVATAR_SRC
+  }, [])
+
+  return (
+    <button
+      onClick={onClick}
+      className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold transition-all duration-150 hover:scale-110 active:scale-95 overflow-hidden"
+      style={{
+        fontFamily: 'var(--font-mono)',
+        background: hasPhoto ? 'transparent' : 'linear-gradient(135deg, var(--accent-dim), oklch(0.74 0.17 148 / 0.15))',
+        color: 'var(--fg)',
+        border: '1px solid var(--accent-glow)',
+        letterSpacing: '0.05em',
+      }}
+      title="Sign out"
+    >
+      {hasPhoto ? (
+        <Image src={AVATAR_SRC} alt="VP" width={32} height={32} className="w-full h-full object-cover rounded-full" />
+      ) : 'VP'}
+    </button>
+  )
 }
 
 export function TopRail() {
@@ -136,20 +169,7 @@ export function TopRail() {
               {dateStr}
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold transition-all duration-150 hover:scale-110 active:scale-95 overflow-hidden"
-            style={{
-              fontFamily: 'var(--font-mono)',
-              background: 'linear-gradient(135deg, var(--accent-dim), oklch(0.74 0.17 148 / 0.15))',
-              color: 'var(--fg)',
-              border: '1px solid var(--accent-glow)',
-              letterSpacing: '0.05em',
-            }}
-            title="Sign out"
-          >
-            VP
-          </button>
+          <AvatarButton onClick={handleLogout} />
         </div>
       </div>
 
