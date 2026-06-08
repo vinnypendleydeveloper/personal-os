@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient, USER_ID } from '@/lib/supabase'
+import { embedMemory } from '@/lib/embed'
 
 export async function GET(req: NextRequest) {
   const db = getServiceClient()
@@ -43,5 +44,13 @@ export async function POST(req: NextRequest) {
   }).select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Embed into long-term memory so the brain can recall it later
+  await embedMemory({
+    text: `Task: ${data.title}${data.description ? ` — ${data.description}` : ''} (${data.urgency}${(data.tags as string[])?.length ? ', ' + (data.tags as string[]).join(' ') : ''})`,
+    sourceType: 'task',
+    sourceId: data.id,
+  })
+
   return NextResponse.json({ task: data })
 }

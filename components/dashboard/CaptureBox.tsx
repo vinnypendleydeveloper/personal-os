@@ -7,6 +7,7 @@ export function CaptureBox() {
   const [expanded, setExpanded] = useState(false)
   const [status, setStatus] = useState<'idle' | 'sending' | 'done' | 'error'>('idle')
   const [classification, setClassification] = useState<string | null>(null)
+  const [habitMarked, setHabitMarked] = useState<string | null>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const boxRef = useRef<HTMLDivElement>(null)
 
@@ -34,9 +35,10 @@ export function CaptureBox() {
       if (res.ok) {
         setStatus('done')
         setClassification(data.classification?.kind ?? null)
+        setHabitMarked(data.habitMarked ?? null)
         setText('')
         setExpanded(false)
-        setTimeout(() => { setStatus('idle'); setClassification(null) }, 3000)
+        setTimeout(() => { setStatus('idle'); setClassification(null); setHabitMarked(null) }, 3500)
       } else {
         setStatus('error')
         setTimeout(() => setStatus('idle'), 3000)
@@ -71,16 +73,32 @@ export function CaptureBox() {
     >
       {/* Toast notification */}
       {status === 'done' && (
-        <div
-          className="absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 rounded-md text-[11px] font-medium animate-fade-up"
-          style={{
-            fontFamily: 'var(--font-mono)',
-            background: 'var(--ok-dim)',
-            border: '1px solid oklch(0.74 0.17 148 / 0.3)',
-            color: 'var(--ok)',
-          }}
-        >
-          ✓ CAPTURED{classification ? ` AS ${classification.toUpperCase()}` : ''}
+        <div className="absolute -top-10 left-1/2 -translate-x-1/2 flex items-center gap-1.5 animate-fade-up">
+          <div
+            className="whitespace-nowrap px-3 py-1.5 rounded-md text-[11px] font-medium"
+            style={{
+              fontFamily: 'var(--font-mono)',
+              background: 'var(--ok-dim)',
+              border: '1px solid oklch(0.74 0.17 148 / 0.3)',
+              color: 'var(--ok)',
+            }}
+          >
+            ✓ CAPTURED{classification ? ` AS ${classification.toUpperCase()}` : ''}
+          </div>
+          {habitMarked && (
+            <div
+              className="whitespace-nowrap px-2.5 py-1.5 rounded-md text-[11px] font-semibold"
+              style={{
+                fontFamily: 'var(--font-mono)',
+                background: 'var(--accent-dim)',
+                border: '1px solid var(--accent-glow)',
+                color: 'var(--accent)',
+              }}
+              title={`Auto-marked habit: ${habitMarked}`}
+            >
+              ⚡ HABIT ✓ {habitMarked.toUpperCase().replace(/ \(.*\)$/, '')}
+            </div>
+          )}
         </div>
       )}
       {status === 'error' && (

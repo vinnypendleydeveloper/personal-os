@@ -1,56 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient, USER_ID } from '@/lib/supabase'
+import { buildContext, buildSystemPrompt, loadConversationMemory } from '@/lib/personalContext'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-export async function POST(req: NextRequest) {
-  const db = getServiceClient()
-  const { question } = await req.json()
+type Msg = { role: 'user' | 'assistant'; content: string }
 
-  // Embed question
-  const embRes = await openai.embeddings.create({
-    model: 'text-embedding-3-small',
-    input: question,
-  })
-  const embedding = embRes.data[0].embedding
-
-  // Get top 20 memory chunks
-  let chunks: { text: string; source_type: string; id: string }[] = []
-  const { data } = await db.rpc('match_memory_chunks', {
-    query_embedding: embedding,
-    match_user_id: USER_ID,
-    match_count: 20,
-  })
-  if (data) chunks = data
-
-  // Fallback to recent captures if no vector results
-  if (chunks.length === 0) {
-    const { data: captures } = await db.from('raw_captures')
-      .select('id, raw_text, created_at')
-      .eq('user_id', USER_ID)
-      .order('created_at', { ascending: false })
-      .limit(20)
-    chunks = (captures ?? []).map(c => ({ id: c.id, text: c.raw_text, source_type: 'capture' }))
-  }
-
-  const context = chunks
-    .map(c => `[${c.id.slice(0, 8)}] (${c.source_type}): ${c.text.slice(0, 200)}`)
-    .join('\n')
-
+async function streamFromAnthropic(system: string, messages: Msg[]): Promise<ReadableStream> {
+  const encoder = new TextEncoder()
   const stream = await anthropic.messages.create({
     model: process.env.ANTHROPIC_MODEL ?? 'claude-haiku-4-5-20251001',
-    max_tokens: 512,
+    max_tokens: 700,
     stream: true,
-    system: `You are the user's personal assistant. Answer the question using ONLY the context provided. Cite sources by referring to capture IDs in [brackets]. If you don't have enough context, say so.`,
-    messages: [{ role: 'user', content: `Context:\n${context}\n\nQuestion: ${question}` }],
+    system,
+    messages,
   })
-
-  // Stream the response
-  const encoder = new TextEncoder()
-  const readable = new ReadableStream({
+  return new ReadableStream({
     async start(controller) {
       for await (const event of stream) {
         if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
@@ -60,8 +28,74 @@ export async function POST(req: NextRequest) {
       controller.close()
     },
   })
+}
 
-  return new NextResponse(readable, {
-    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+async function streamFromOpenAI(system: string, messages: Msg[]): Promise<ReadableStream> {
+  const encoder = new TextEncoder()
+  const stream = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    max_tokens: 700,
+    stream: true,
+    messages: [{ role: 'system', content: system }, ...messages],
   })
+  return new ReadableStream({
+    async start(controller) {
+      for await (const chunk of stream) {
+        const text = chunk.choices[0]?.delta?.content ?? ''
+        if (text) controller.enqueue(encoder.encode(text))
+      }
+      controller.close()
+    },
+  })
+}
+
+async function tryStream(system: string, messages: Msg[]): Promise<ReadableStream> {
+  try {
+    return await streamFromAnthropic(system, messages)
+  } catch {
+    return await streamFromOpenAI(system, messages)
+  }
+}
+
+export async function POST(req: NextRequest) {
+  const db = getServiceClient()
+  const body = await req.json()
+  // Accept either a single { question } or a multi-turn { history: Msg[] }
+  const history: Msg[] = Array.isArray(body.history) ? body.history : []
+  const question: string = body.question ?? history[history.length - 1]?.content ?? ''
+  if (!question?.trim() && history.length === 0) {
+    return NextResponse.json({ error: 'No question' }, { status: 400 })
+  }
+
+  const contextBlocks = await buildContext(db)
+  let systemPrompt = buildSystemPrompt(contextBlocks)
+
+  // Semantic memory recall
+  try {
+    const embRes = await openai.embeddings.create({ model: 'text-embedding-3-small', input: question })
+    const { data: chunks } = await db.rpc('match_memory_chunks', {
+      query_embedding: embRes.data[0].embedding,
+      match_user_id: USER_ID,
+      match_count: 8,
+    })
+    if (chunks?.length) {
+      const memText = (chunks as { text: string; source_type: string }[])
+        .map(c => `• [${c.source_type}] ${c.text.slice(0, 150)}`).join('\n')
+      systemPrompt += `\n\n=== SEMANTIC MEMORY (relevant past items) ===\n${memText}`
+    }
+  } catch {}
+
+  // Build the message list. If the client sent an explicit multi-turn history,
+  // honor it. Otherwise replay the last 10 turns from persistent memory so the
+  // AI remembers prior sessions, then append the new question.
+  let messages: Msg[]
+  if (history.length > 0) {
+    messages = history
+  } else {
+    const memory = await loadConversationMemory(db, 10)
+    messages = [...memory, { role: 'user', content: question }]
+  }
+
+  const stream = await tryStream(systemPrompt, messages)
+  return new NextResponse(stream, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
 }

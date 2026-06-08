@@ -1,0 +1,373 @@
+'use client'
+
+import { useEffect, useState, useRef, DragEvent, KeyboardEvent } from 'react'
+import { Shell } from '@/components/dashboard/Shell'
+import { Panel } from '@/components/dashboard/Panel'
+
+function localDate() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
+function WeightInput() {
+  const today = localDate()
+  const [saved, setSaved] = useState<number | null>(null)
+  const [input, setInput] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [dirty, setDirty] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch(`/api/weight?date=${today}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.weight_lbs != null) {
+          setSaved(d.weight_lbs)
+          setInput(d.weight_lbs.toFixed(1))
+        }
+      })
+      .catch(() => {})
+  }, [today])
+
+  async function save() {
+    const val = parseFloat(input)
+    if (saving) return
+    if (!val || val < 50 || val > 999) {
+      setError('Enter a weight between 50 and 999 lbs')
+      return
+    }
+    const rounded = Math.round(val * 10) / 10
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/weight', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: today, weight_lbs: rounded }),
+      })
+      if (!res.ok) throw new Error(`Save failed (${res.status})`)
+      setSaved(rounded)
+      setInput(rounded.toFixed(1))
+      setDirty(false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save — try again')
+    }
+    setSaving(false)
+  }
+
+  const isEditing = dirty || saved == null
+
+  return (
+    <Panel index={0} title="Weight" action={
+      saved != null && !dirty ? (
+        <span className="font-mono text-[10px]" style={{ color: 'var(--ok)' }}>LOGGED ●</span>
+      ) : undefined
+    }>
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1">
+          <input
+            type="number"
+            min={50}
+            max={999}
+            step={0.1}
+            value={input}
+            onChange={e => { setInput(e.target.value); setDirty(true); if (error) setError(null) }}
+            onKeyDown={e => e.key === 'Enter' && save()}
+            placeholder="Enter weight…"
+            className="w-full font-mono font-bold rounded px-3 py-2 outline-none text-right"
+            style={{
+              fontSize: '1.5rem',
+              background: 'var(--bg-2)',
+              border: `1px solid ${isEditing ? 'var(--warn)' : 'var(--border)'}`,
+              color: 'var(--warn)',
+              boxShadow: isEditing ? '0 0 8px oklch(0.82 0.16 76 / 0.15)' : 'none',
+              transition: 'border-color 200ms, box-shadow 200ms',
+            }}
+          />
+          <span
+            className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs pointer-events-none"
+            style={{ color: 'var(--fg-4)' }}
+          >
+            lbs
+          </span>
+        </div>
+        {isEditing && (
+          <button
+            onClick={save}
+            disabled={saving || !input || parseFloat(input) <= 0}
+            className="font-mono text-xs px-4 py-2.5 rounded font-bold disabled:opacity-40 transition-all hover:brightness-110 shrink-0"
+            style={{ background: 'var(--warn)', color: 'var(--bg)' }}
+          >
+            {saving ? '…' : 'SAVE'}
+          </button>
+        )}
+      </div>
+      {error && (
+        <p className="font-mono text-[10px]" style={{ color: 'var(--hot)' }}>
+          {error}
+        </p>
+      )}
+      {!error && saved != null && !dirty && (
+        <p className="font-mono text-[10px]" style={{ color: 'var(--fg-4)' }}>
+          Today's log: {saved.toFixed(1)} lbs · click the field to update
+        </p>
+      )}
+    </Panel>
+  )
+}
+
+interface Item { id: string; label: string }
+
+export default function MorningRoutinePage() {
+  const [items, setItems] = useState<Item[]>([])
+  const [completions, setCompletions] = useState<Record<string, string>>({})
+  const [streak, setStreak] = useState(0)
+  const [loading, setLoading] = useState(true)
+
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [overId, setOverId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState('')
+  const [newLabel, setNewLabel] = useState('')
+  const editRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    fetch('/api/morning-routine')
+      .then(r => r.json())
+      .then(d => {
+        setItems(d.items ?? [])
+        setCompletions(d.completions ?? {})
+        setStreak(d.streak ?? 0)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [])
+
+  useEffect(() => { if (editingId) editRef.current?.select() }, [editingId])
+
+  function saveItems(next: Item[]) {
+    setItems(next)
+    fetch('/api/morning-routine', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'items', items: next }),
+    }).catch(console.error)
+  }
+
+  async function toggle(id: string) {
+    const isDone = !!completions[id]
+    // optimistic
+    const next = { ...completions }
+    if (isDone) delete next[id]
+    else next[id] = new Date().toISOString()
+    setCompletions(next)
+    try {
+      const res = await fetch('/api/morning-routine', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'toggle', itemId: id, completed: !isDone }),
+      })
+      const d = await res.json()
+      if (d.completions) setCompletions(d.completions)
+      if (typeof d.streak === 'number') setStreak(d.streak)
+    } catch { /* keep optimistic state */ }
+  }
+
+  function addItem() {
+    const label = newLabel.trim()
+    if (!label) return
+    const item: Item = { id: crypto.randomUUID(), label }
+    saveItems([...items, item])
+    setNewLabel('')
+  }
+
+  function deleteItem(id: string) {
+    saveItems(items.filter(i => i.id !== id))
+  }
+
+  function commitRename(id: string) {
+    const v = editDraft.trim()
+    setEditingId(null)
+    if (v) saveItems(items.map(i => i.id === id ? { ...i, label: v } : i))
+  }
+
+  // ── Drag and drop reorder ──
+  function onDrop(targetId: string) {
+    if (!dragId || dragId === targetId) { setDragId(null); setOverId(null); return }
+    const from = items.findIndex(i => i.id === dragId)
+    const to = items.findIndex(i => i.id === targetId)
+    const next = [...items]
+    const [moved] = next.splice(from, 1)
+    next.splice(to, 0, moved)
+    saveItems(next)
+    setDragId(null); setOverId(null)
+  }
+
+  const completed = items.filter(i => completions[i.id]).length
+  const total = items.length
+  const pct = total ? Math.round((completed / total) * 100) : 0
+  const allDone = total > 0 && completed === total
+
+  return (
+    <Shell>
+      <div className="flex flex-col gap-4" style={{ maxWidth: 640, margin: '0 auto' }}>
+
+        <WeightInput />
+
+        {/* Header */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h1 style={{ fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, letterSpacing: '0.16em', color: 'var(--fg)' }}>
+            MORNING ROUTINE
+          </h1>
+          <div className="flex items-center gap-1.5" title="Days in a row you've completed the full routine">
+            <span style={{ fontSize: 14 }}>🔥</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 800, color: streak > 0 ? 'oklch(0.74 0.16 70)' : 'var(--fg-4)' }}>
+              {streak}
+            </span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--fg-4)', letterSpacing: '0.1em' }}>
+              DAY{streak === 1 ? '' : 'S'}
+            </span>
+          </div>
+        </div>
+
+        <Panel index={1} title="Today" status={allDone ? 'online' : 'none'} action={
+          <span className="card-label" style={{ color: allDone ? 'var(--ok)' : 'var(--fg-3)' }}>
+            {completed}/{total}{allDone ? ' COMPLETE ●' : ''}
+          </span>
+        }>
+          {/* Progress bar */}
+          <div className="relative h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-3)' }}>
+            <div className="h-full rounded-full transition-all duration-500 ease-out" style={{
+              width: `${pct}%`,
+              background: allDone
+                ? 'linear-gradient(90deg, var(--ok), oklch(0.82 0.16 148))'
+                : 'linear-gradient(90deg, var(--accent), oklch(0.74 0.16 70))',
+              boxShadow: pct > 0 ? `0 0 8px ${allDone ? 'var(--ok)' : 'var(--accent)'}` : 'none',
+            }} />
+          </div>
+
+          {loading ? (
+            <p className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-4)' }}>LOADING…</p>
+          ) : (
+            <div className="flex flex-col gap-1 mt-1">
+              {items.map((item, idx) => {
+                const done = completions[item.id]
+                const isOver = overId === item.id && dragId !== item.id
+                return (
+                  <div
+                    key={item.id}
+                    draggable={editingId !== item.id}
+                    onDragStart={() => setDragId(item.id)}
+                    onDragEnd={() => { setDragId(null); setOverId(null) }}
+                    onDragOver={(e: DragEvent) => { e.preventDefault(); setOverId(item.id) }}
+                    onDrop={() => onDrop(item.id)}
+                    className="group flex items-center gap-2.5 rounded-lg px-2 py-2 transition-all"
+                    style={{
+                      background: isOver ? 'var(--accent-dim)' : 'transparent',
+                      borderTop: isOver ? '2px solid var(--accent)' : '2px solid transparent',
+                      opacity: dragId === item.id ? 0.4 : 1,
+                      cursor: editingId === item.id ? 'text' : 'grab',
+                    }}
+                  >
+                    {/* Drag handle */}
+                    <span className="shrink-0 select-none opacity-30 group-hover:opacity-60 transition-opacity" style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--fg-3)', cursor: 'grab' }}>
+                      ⠿
+                    </span>
+
+                    {/* Index */}
+                    <span className="shrink-0 w-4 text-right tabular-nums" style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-4)' }}>
+                      {idx + 1}
+                    </span>
+
+                    {/* Checkbox */}
+                    <button
+                      onClick={() => toggle(item.id)}
+                      className="w-5 h-5 rounded shrink-0 border flex items-center justify-center transition-all duration-200"
+                      style={{
+                        background: done ? 'var(--ok)' : 'transparent',
+                        borderColor: done ? 'var(--ok)' : 'var(--bg-3)',
+                        boxShadow: done ? '0 0 6px var(--ok-dim)' : 'none',
+                      }}
+                    >
+                      {done && (
+                        <svg width="10" height="8" viewBox="0 0 8 6" fill="none"><path d="M1 3L3 5L7 1" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      )}
+                    </button>
+
+                    {/* Label (click to rename) */}
+                    {editingId === item.id ? (
+                      <input
+                        ref={editRef}
+                        value={editDraft}
+                        onChange={e => setEditDraft(e.target.value)}
+                        onBlur={() => commitRename(item.id)}
+                        onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
+                          if (e.key === 'Enter') commitRename(item.id)
+                          if (e.key === 'Escape') setEditingId(null)
+                        }}
+                        autoFocus
+                        className="flex-1 text-sm outline-none rounded px-1.5 py-0.5 min-w-0"
+                        style={{ background: 'var(--bg-2)', border: '1px solid var(--accent-glow)', color: 'var(--fg)' }}
+                      />
+                    ) : (
+                      <span
+                        onClick={() => { setEditDraft(item.label); setEditingId(item.id) }}
+                        className="flex-1 text-sm cursor-text transition-all duration-200 min-w-0"
+                        style={{
+                          color: done ? 'var(--fg-4)' : 'var(--fg)',
+                          textDecoration: done ? 'line-through' : 'none',
+                          textDecorationColor: 'var(--fg-4)',
+                        }}
+                        title="Click to rename"
+                      >
+                        {item.label}
+                      </span>
+                    )}
+
+                    {/* Completion timestamp */}
+                    {done && (
+                      <span className="shrink-0 tabular-nums" style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ok)' }}>
+                        {new Date(done).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                      </span>
+                    )}
+
+                    {/* Delete */}
+                    <button
+                      onClick={() => deleteItem(item.id)}
+                      className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--hot)' }}
+                      title="Delete item"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )
+              })}
+
+              {/* Add new item */}
+              <div className="flex items-center gap-2 mt-2 pt-2" style={{ borderTop: '1px solid var(--border)' }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent)', marginLeft: 6 }}>+</span>
+                <input
+                  value={newLabel}
+                  onChange={e => setNewLabel(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addItem()}
+                  placeholder="Add a step…"
+                  className="flex-1 text-sm px-2 py-1.5 rounded-lg outline-none"
+                  style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', color: 'var(--fg)' }}
+                />
+                <button
+                  onClick={addItem}
+                  disabled={!newLabel.trim()}
+                  className="text-xs px-3 py-1.5 rounded-lg font-semibold disabled:opacity-30 hover:brightness-110"
+                  style={{ fontFamily: 'var(--font-mono)', background: 'var(--accent)', color: 'oklch(0.09 0.008 255)' }}
+                >ADD</button>
+              </div>
+            </div>
+          )}
+        </Panel>
+
+        <p className="text-[10px] text-center" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-4)' }}>
+          Drag ⠿ to reorder · click a step to rename · completions reset at midnight
+        </p>
+      </div>
+    </Shell>
+  )
+}

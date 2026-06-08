@@ -41,6 +41,48 @@ function isOverdue(task: Task) {
   return new Date(task.due_date) < new Date(new Date().toDateString())
 }
 
+// ── Chip system (shared visual language with the Session card) ──
+const WHERE: Record<string, { label: string; color: string }> = {
+  'deep-work': { label: 'DEEP WORK', color: 'oklch(0.70 0.16 250)' },
+  'gym':       { label: 'GYM',       color: 'oklch(0.72 0.18 30)' },
+  'court':     { label: 'COURT',     color: 'oklch(0.74 0.17 148)' },
+  'campus':    { label: 'CAMPUS',    color: 'oklch(0.70 0.16 300)' },
+  'calls':     { label: 'CALLS',     color: 'oklch(0.74 0.15 200)' },
+  'errands':   { label: 'ERRANDS',   color: 'oklch(0.74 0.16 70)' },
+  'home':      { label: 'HOME',      color: 'oklch(0.66 0.05 255)' },
+  'anywhere':  { label: 'ANYWHERE',  color: 'var(--ink-4)' },
+}
+
+function priorityBadge(score: number): { label: string; color: string; filled: boolean } {
+  if (score >= 67) return { label: 'HIGH', color: 'var(--danger)', filled: true }
+  if (score >= 34) return { label: 'MED',  color: 'var(--warn)',   filled: false }
+  if (score >= 1)  return { label: 'LOW',  color: 'var(--accent)', filled: false }
+  return { label: 'NO PRIORITY', color: 'var(--ink-4)', filled: false }
+}
+
+function splitTags(tags: string[]) {
+  const ctx = tags?.find(t => t.startsWith('@'))?.slice(1) ?? null
+  const topical = tags?.filter(t => !t.startsWith('@')) ?? []
+  return { ctx, topical }
+}
+
+function fmtDue(d: string) {
+  const [y, m, day] = d.split('-').map(Number)
+  return new Date(y, m - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function Chip({ label, color, filled = false }: { label: string; color: string; filled?: boolean }) {
+  return (
+    <span style={{
+      fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600, letterSpacing: '0.06em',
+      padding: '1px 5px', borderRadius: 4, lineHeight: 1.4, whiteSpace: 'nowrap',
+      color: filled ? 'oklch(0.12 0.01 255)' : color,
+      background: filled ? color : `color-mix(in oklch, ${color} 14%, transparent)`,
+      border: `1px solid color-mix(in oklch, ${color} 35%, transparent)`,
+    }}>{label}</span>
+  )
+}
+
 export default function CRMPage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
@@ -396,20 +438,32 @@ function TaskCard({ task, tierColor, onClick, onComplete, onDelete }: {
           >✕</button>
         </div>
       </div>
-      {(task.tags?.length > 0 || task.time_estimate_min) && (
-        <div className="flex gap-1 mt-1.5 flex-wrap">
-          {task.time_estimate_min && (
-            <span className="font-mono text-[10px] px-1 rounded" style={{ background: 'var(--ink-2)', color: 'var(--ink-4)' }}>
-              ~{task.time_estimate_min}m
-            </span>
-          )}
-          {task.tags?.map(tag => (
-            <span key={tag} className="text-[10px] px-1 rounded" style={{ background: 'var(--ink-2)', color: tierColor }}>
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
+      {(() => {
+        const prio = priorityBadge(task.priority_score)
+        const { ctx, topical } = splitTags(task.tags ?? [])
+        const where = ctx ? (WHERE[ctx] ?? { label: ctx.toUpperCase(), color: 'var(--ink-4)' }) : null
+        const overdue = isOverdue(task)
+        return (
+          <div className="flex gap-1 mt-1.5 flex-wrap items-center">
+            {/* Priority — always shown (neutral chip if none) */}
+            <Chip label={prio.label} color={prio.color} filled={prio.filled} />
+            {/* Where */}
+            {where && <Chip label={where.label} color={where.color} />}
+            {/* Due date if set */}
+            {task.due_date && (
+              <Chip label={`DUE ${fmtDue(task.due_date)}`} color={overdue ? 'var(--danger)' : 'var(--ink-4)'} filled={overdue} />
+            )}
+            {/* Time estimate */}
+            {task.time_estimate_min && (
+              <span className="font-mono" style={{ fontSize: 9, color: 'var(--ink-4)' }}>~{task.time_estimate_min}m</span>
+            )}
+            {/* Topical tags */}
+            {topical.map(tag => (
+              <span key={tag} className="font-mono" style={{ fontSize: 9, color: tierColor }}>#{tag}</span>
+            ))}
+          </div>
+        )
+      })()}
     </div>
   )
 }

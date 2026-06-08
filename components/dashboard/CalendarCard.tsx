@@ -10,6 +10,19 @@ interface CalEvent {
   end: string
   allDay: boolean
   location?: string
+  tag?: string
+}
+
+// Color per derived calendar tag
+const TAG_COLOR: Record<string, string> = {
+  class:    'oklch(0.70 0.16 300)',
+  gym:      'oklch(0.72 0.18 30)',
+  tennis:   'oklch(0.74 0.17 148)',
+  call:     'oklch(0.74 0.15 200)',
+  meeting:  'oklch(0.70 0.16 250)',
+  work:     'oklch(0.74 0.16 70)',
+  social:   'oklch(0.74 0.17 350)',
+  personal: 'var(--fg-3)',
 }
 
 function fmt(date: Date, opts: Intl.DateTimeFormatOptions) {
@@ -84,20 +97,35 @@ export function CalendarCard() {
             No events for {fmt(selectedDate, { month: 'short', day: 'numeric' })}.
           </p>
         ) : (
-          selectedEvents.map(event => (
-            <div key={event.id} className="flex gap-2 items-start">
-              <div className="w-1 rounded-full mt-1.5 shrink-0 self-stretch" style={{ background: 'var(--accent)', minHeight: '8px' }} />
-              <div>
-                <p className="text-xs font-medium" style={{ color: 'var(--foreground)' }}>{event.title}</p>
-                <p className="text-[10px] font-mono" style={{ color: 'var(--ink-4)' }}>
-                  {event.allDay ? 'All day' : `${fmt(new Date(event.start), { hour: 'numeric', minute: '2-digit' })} – ${fmt(new Date(event.end), { hour: 'numeric', minute: '2-digit' })}`}
-                </p>
-                {event.location && (
-                  <p className="text-[10px]" style={{ color: 'var(--ink-4)' }}>📍 {event.location}</p>
-                )}
+          selectedEvents.map(event => {
+            const tagColor = TAG_COLOR[event.tag ?? 'personal'] ?? 'var(--fg-3)'
+            return (
+              <div key={event.id} className="flex gap-2 items-start">
+                <div className="w-1 rounded-full mt-1.5 shrink-0 self-stretch" style={{ background: tagColor, minHeight: '8px', boxShadow: `0 0 5px color-mix(in oklch, ${tagColor} 55%, transparent)` }} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="text-xs font-medium" style={{ color: 'var(--foreground)' }}>{event.title}</p>
+                    {event.tag && (
+                      <span style={{
+                        fontFamily: 'var(--font-mono)', fontSize: 8, fontWeight: 600, letterSpacing: '0.06em',
+                        padding: '1px 4px', borderRadius: 3, color: tagColor,
+                        background: `color-mix(in oklch, ${tagColor} 13%, transparent)`,
+                        border: `1px solid color-mix(in oklch, ${tagColor} 32%, transparent)`,
+                      }}>
+                        {event.tag.toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] font-mono" style={{ color: 'var(--ink-4)' }}>
+                    {event.allDay ? 'All day' : `${fmt(new Date(event.start), { hour: 'numeric', minute: '2-digit' })} – ${fmt(new Date(event.end), { hour: 'numeric', minute: '2-digit' })}`}
+                  </p>
+                  {event.location && (
+                    <p className="text-[10px]" style={{ color: 'var(--ink-4)' }}>📍 {event.location}</p>
+                  )}
+                </div>
               </div>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
       <div ref={nowRef} />

@@ -7,9 +7,13 @@ import { useState, useEffect } from 'react'
 
 const TABS = [
   { label: 'HOME', href: '/' },
+  { label: 'LOG', href: '/log' },
+  { label: 'ROUTINE', href: '/morning-routine' },
+  { label: 'GYM', href: '/gym-log' },
   { label: 'CRM', href: '/crm' },
   { label: 'FINANCE', href: '/finance' },
-  { label: 'REVIEW', href: '/review' },
+  { label: 'REVIEW', href: '/weekly-review' },
+  { label: 'HISTORY', href: '/history' },
   { label: 'BRAIN', href: '/brain' },
   { label: 'HEALTH', href: '/health' },
 ]

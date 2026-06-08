@@ -13,6 +13,20 @@ export interface CalendarEvent {
   end: string   // ISO
   allDay: boolean
   location?: string
+  tag: string   // derived category: class | meeting | gym | tennis | call | work | social | personal
+}
+
+// iCal events have no native tags — derive one from title/location keywords
+export function deriveTag(title: string, location?: string): string {
+  const s = `${title} ${location ?? ''}`.toLowerCase()
+  if (/(class|lecture|lab|exam|midterm|final|office hours|usc|course|seminar)/.test(s)) return 'class'
+  if (/(gym|workout|lift|training|run|fitness)/.test(s)) return 'gym'
+  if (/(tennis|court|coach|lesson|camp|match|practice)/.test(s)) return 'tennis'
+  if (/(call|zoom|meet|sync|1:1|interview|standup|google meet|teams)/.test(s)) return 'call'
+  if (/(meeting|review|planning|kickoff|demo|presentation)/.test(s)) return 'meeting'
+  if (/(work|deadline|deliverable|client|project|build|ship)/.test(s)) return 'work'
+  if (/(dinner|lunch|coffee|party|hang|birthday|date|drinks|social)/.test(s)) return 'social'
+  return 'personal'
 }
 
 export async function GET() {
@@ -65,6 +79,7 @@ export async function GET() {
               end: end.toISOString(),
               allDay: event.startDate.isDate,
               location: event.location ?? undefined,
+              tag: deriveTag(event.summary, event.location ?? undefined),
             })
           }
           next = iter.next()
@@ -80,6 +95,7 @@ export async function GET() {
             end: end.toISOString(),
             allDay: event.startDate.isDate,
             location: event.location ?? undefined,
+            tag: deriveTag(event.summary, event.location ?? undefined),
           })
         }
       }

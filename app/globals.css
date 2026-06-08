@@ -26,6 +26,13 @@
   --hot:    oklch(0.66 0.22 22);
   --hot-dim: oklch(0.66 0.22 22 / 0.12);
 
+  /* Water */
+  --water:        oklch(0.68 0.17 210);
+  --water-hi:     oklch(0.80 0.15 200);
+  --water-dim:    oklch(0.68 0.17 210 / 0.12);
+  --water-glow:   oklch(0.68 0.17 210 / 0.35);
+  --water-border: oklch(0.68 0.17 210 / 0.25);
+
   /* Border */
   --border: oklch(1 0 0 / 0.07);
   --border-hi: oklch(1 0 0 / 0.14);
@@ -50,7 +57,7 @@
 
 * { box-sizing: border-box; }
 
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; font-size: 132%; }
 
 body {
   background: var(--bg);
@@ -182,6 +189,16 @@ input:focus, textarea:focus, select:focus {
 @keyframes shine {
   from { left: -100%; }
   to   { left: 200%; }
+}
+
+/* ─── Water fill shimmer ──────────────────────────────────── */
+@keyframes water-shimmer {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+.water-fill {
+  animation: water-shimmer 2.5s linear infinite;
+  background-size: 200% 100% !important;
 }
 
 /* ─── CRM tier badge ──────────────────────────────────────── */

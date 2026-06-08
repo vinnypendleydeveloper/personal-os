@@ -34,5 +34,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  // Exclude Next internals and static asset files (images, fonts) from auth —
+  // the image optimizer fetches these server-side without a session cookie.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:jpg|jpeg|png|gif|svg|webp|ico|woff2?)$).*)'],
 }
