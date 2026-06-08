@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef, DragEvent, KeyboardEvent } from 'react'
+import { useEffect, useState, useRef, useCallback, DragEvent, KeyboardEvent } from 'react'
 import { Shell } from '@/components/dashboard/Shell'
 import { Panel } from '@/components/dashboard/Panel'
 
@@ -9,13 +9,16 @@ function localDate() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 }
 
-function WeightInput() {
+function WeightInput({ onSaved }: { onSaved: (logged: boolean) => void }) {
   const today = localDate()
   const [saved, setSaved] = useState<number | null>(null)
   const [input, setInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Stable ref so useEffect doesn't re-run when parent re-renders
+  const onSavedRef = useRef(onSaved)
+  useEffect(() => { onSavedRef.current = onSaved }, [onSaved])
 
   useEffect(() => {
     fetch(`/api/weight?date=${today}`)
@@ -24,6 +27,7 @@ function WeightInput() {
         if (d.weight_lbs != null) {
           setSaved(d.weight_lbs)
           setInput(d.weight_lbs.toFixed(1))
+          onSavedRef.current(true)
         }
       })
       .catch(() => {})
@@ -49,6 +53,7 @@ function WeightInput() {
       setSaved(rounded)
       setInput(rounded.toFixed(1))
       setDirty(false)
+      onSavedRef.current(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save — try again')
     }
@@ -59,9 +64,9 @@ function WeightInput() {
 
   return (
     <Panel index={0} title="Weight" action={
-      saved != null && !dirty ? (
-        <span className="font-mono text-[10px]" style={{ color: 'var(--ok)' }}>LOGGED ●</span>
-      ) : undefined
+      saved != null && !dirty
+        ? <span className="font-mono text-[10px]" style={{ color: 'var(--ok)' }}>LOGGED ●</span>
+        : <span className="font-mono text-[10px]" style={{ color: 'var(--hot)' }}>REQUIRED</span>
     }>
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
@@ -112,6 +117,11 @@ function WeightInput() {
           Today's log: {saved.toFixed(1)} lbs · click the field to update
         </p>
       )}
+      {!error && saved == null && (
+        <p className="font-mono text-[10px]" style={{ color: 'var(--fg-3)' }}>
+          Log weight to unlock routine completion
+        </p>
+      )}
     </Panel>
   )
 }
@@ -123,6 +133,8 @@ export default function MorningRoutinePage() {
   const [completions, setCompletions] = useState<Record<string, string>>({})
   const [streak, setStreak] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [weightLogged, setWeightLogged] = useState(false)
+  const handleWeightSaved = useCallback((v: boolean) => setWeightLogged(v), [])
 
   const [dragId, setDragId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
@@ -201,16 +213,19 @@ export default function MorningRoutinePage() {
     setDragId(null); setOverId(null)
   }
 
-  const completed = items.filter(i => completions[i.id]).length
-  const total = items.length
-  const pct = total ? Math.round((completed / total) * 100) : 0
-  const allDone = total > 0 && completed === total
+  const completedItems = items.filter(i => completions[i.id]).length
+  const totalItems = items.length
+  // Weight is a required step — counts as 1 of N+1 in the progress bar
+  const progressCompleted = completedItems + (weightLogged ? 1 : 0)
+  const progressTotal = totalItems + 1
+  const pct = progressTotal ? Math.round((progressCompleted / progressTotal) * 100) : 0
+  const allDone = weightLogged && totalItems > 0 && completedItems === totalItems
 
   return (
     <Shell>
       <div className="flex flex-col gap-4" style={{ maxWidth: 640, margin: '0 auto' }}>
 
-        <WeightInput />
+        <WeightInput onSaved={handleWeightSaved} />
 
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-2">
@@ -230,7 +245,7 @@ export default function MorningRoutinePage() {
 
         <Panel index={1} title="Today" status={allDone ? 'online' : 'none'} action={
           <span className="card-label" style={{ color: allDone ? 'var(--ok)' : 'var(--fg-3)' }}>
-            {completed}/{total}{allDone ? ' COMPLETE ●' : ''}
+            {progressCompleted}/{progressTotal}{allDone ? ' COMPLETE ●' : ''}
           </span>
         }>
           {/* Progress bar */}

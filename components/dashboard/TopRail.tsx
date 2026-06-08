@@ -16,6 +16,7 @@ const TABS = [
   { label: 'HISTORY', href: '/history' },
   { label: 'BRAIN', href: '/brain' },
   { label: 'HEALTH', href: '/health' },
+  { label: 'WEIGHT', href: '/weight' },
 ]
 
 interface TickerItem { label: string; value: string; change?: string; up?: boolean | null }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts'
 import { Panel } from './Panel'
 
@@ -38,7 +39,11 @@ export function WeightCard() {
   const chartData = history.map(h => ({ v: h.weight_lbs }))
 
   return (
-    <Panel index={9} title="Weight">
+    <Panel index={9} title="Weight" action={
+      <Link href="/weight" className="font-mono text-[10px] hover:brightness-125 transition-all" style={{ color: 'var(--fg-4)' }}>
+        ALL →
+      </Link>
+    }>
       <div className="flex items-end justify-between">
         <div className="flex items-baseline gap-1.5">
           {loading ? (
