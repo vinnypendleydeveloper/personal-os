@@ -25,7 +25,7 @@ function bestWeight(ex: LoggedExercise) {
 
 // ── Minimal SVG line chart ────────────────────────────────────
 function LineChart({ points, color = 'var(--accent)', unitLabel = '' }: { points: { label: string; value: number }[]; color?: string; unitLabel?: string }) {
-  if (points.length === 0) return <p className="text-xs" style={{ color: 'var(--fg-4)' }}>No data yet.</p>
+  if (points.length === 0) return <p className="text-xs" style={{ color: 'var(--fg-2)' }}>No data yet.</p>
   const W = 320, H = 110, pad = 18
   const vals = points.map(p => p.value)
   const min = Math.min(...vals), max = Math.max(...vals)
@@ -50,7 +50,7 @@ function LineChart({ points, color = 'var(--accent)', unitLabel = '' }: { points
           </g>
         ))}
       </svg>
-      <div className="flex justify-between" style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--fg-4)' }}>
+      <div className="flex justify-between" style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--fg-2)' }}>
         <span>{points[0].label}</span>
         {unitLabel && <span>{unitLabel}</span>}
         <span>{points[points.length - 1].label}</span>
@@ -115,10 +115,10 @@ export default function GymHistoryPage() {
         </div>
 
         {loading ? (
-          <p className="text-xs py-8 text-center" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-4)' }}>LOADING…</p>
+          <p className="text-xs py-8 text-center" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)' }}>LOADING…</p>
         ) : sessions.length === 0 ? (
           <Panel index={1} title="No sessions yet">
-            <p className="text-xs" style={{ color: 'var(--fg-4)' }}>Log your first workout and it&apos;ll show up here.</p>
+            <p className="text-xs" style={{ color: 'var(--fg-2)' }}>Log your first workout and it&apos;ll show up here.</p>
           </Panel>
         ) : (
           <>
@@ -129,7 +129,7 @@ export default function GymHistoryPage() {
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--ok)' }}>↑ {latestProgress.summary.up} improved</span>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--fg-3)' }}>= {latestProgress.summary.same} held</span>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--warn)' }}>↓ {latestProgress.summary.down} dropped</span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-4)', marginLeft: 'auto' }}>latest vs {fmtDate(latestProgress.summary.comparedTo)}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-2)', marginLeft: 'auto' }}>latest vs {fmtDate(latestProgress.summary.comparedTo)}</span>
                 </div>
               </Panel>
             )}
@@ -142,7 +142,7 @@ export default function GymHistoryPage() {
               <Panel index={3} title="Sauna" status={saunaThisMonth > 0 ? 'online' : 'none'}>
                 <div className="flex flex-col items-center justify-center h-full gap-1 py-2">
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 34, fontWeight: 800, color: 'var(--ok)' }}>{saunaThisMonth}</span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-4)', letterSpacing: '0.1em' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-2)', letterSpacing: '0.1em' }}>
                     SAUNA DAYS · {now.toLocaleDateString('en-US', { month: 'long' }).toUpperCase()}
                   </span>
                 </div>
@@ -160,7 +160,7 @@ export default function GymHistoryPage() {
             }>
               {exercise
                 ? <LineChart points={exercisePoints} color="var(--accent)" unitLabel="top set" />
-                : <p className="text-xs" style={{ color: 'var(--fg-4)' }}>Select an exercise to see weight progression over time.</p>}
+                : <p className="text-xs" style={{ color: 'var(--fg-2)' }}>Select an exercise to see weight progression over time.</p>}
             </Panel>
 
             {/* Sessions list */}
@@ -172,7 +172,7 @@ export default function GymHistoryPage() {
                     <div key={s.date} style={{ borderTop: i === 0 ? 'none' : '1px solid var(--border)' }}>
                       <button onClick={() => setExpanded(open ? null : s.date)}
                         className="flex items-center gap-3 w-full text-left py-2.5">
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-4)', width: 12 }}>{open ? '▾' : '▸'}</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-2)', width: 12 }}>{open ? '▾' : '▸'}</span>
                         <div className="flex-1 min-w-0">
                           <span className="text-sm font-medium" style={{ color: 'var(--fg)' }}>{fmtDate(s.date)}</span>
                           <span className="text-xs ml-2" style={{ color: 'var(--fg-3)' }}>Day {s.day} · {s.label}</span>
@@ -184,7 +184,7 @@ export default function GymHistoryPage() {
                       </button>
                       {open && (
                         <div className="pb-3 pl-6 flex flex-col gap-2">
-                          {s.exercises.length === 0 && <p className="text-xs" style={{ color: 'var(--fg-4)' }}>Rest day.</p>}
+                          {s.exercises.length === 0 && <p className="text-xs" style={{ color: 'var(--fg-2)' }}>Rest day.</p>}
                           {s.exercises.map(ex => (
                             <div key={ex.name} className="flex items-baseline gap-2 flex-wrap">
                               <span className="text-xs font-medium" style={{ color: 'var(--fg-2)', minWidth: 180 }}>{ex.name}</span>
@@ -201,7 +201,7 @@ export default function GymHistoryPage() {
                               </span>
                             </div>
                           ))}
-                          {s.notes && <p className="text-xs mt-1" style={{ color: 'var(--fg-4)' }}>📝 {s.notes}</p>}
+                          {s.notes && <p className="text-xs mt-1" style={{ color: 'var(--fg-2)' }}>📝 {s.notes}</p>}
                         </div>
                       )}
                     </div>

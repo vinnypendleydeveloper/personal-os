@@ -64,7 +64,7 @@ export function MorningRoutineCard() {
             ) : (
               <div className="flex items-baseline" style={{ fontFamily: 'var(--font-mono)' }}>
                 <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--fg)', lineHeight: 1 }}>{loading ? '–' : completed}</span>
-                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-4)' }}>/{total || '–'}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-2)' }}>/{total || '–'}</span>
               </div>
             )}
           </div>
@@ -73,7 +73,7 @@ export function MorningRoutineCard() {
         {/* Next item / complete state */}
         <div className="flex flex-col gap-0.5 min-w-0">
           {loading ? (
-            <span className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-4)' }}>LOADING…</span>
+            <span className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)' }}>LOADING…</span>
           ) : allDone ? (
             <>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', color: 'var(--ok)' }}>
@@ -83,7 +83,7 @@ export function MorningRoutineCard() {
             </>
           ) : (
             <>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', color: 'var(--fg-4)' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', color: 'var(--fg-2)' }}>
                 NEXT
               </span>
               <span className="text-sm font-medium truncate" style={{ color: 'var(--fg)' }}>
@@ -91,7 +91,7 @@ export function MorningRoutineCard() {
               </span>
             </>
           )}
-          <span className="text-[10px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-4)' }}>
+          <span className="text-[10px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)' }}>
             Open routine →
           </span>
         </div>

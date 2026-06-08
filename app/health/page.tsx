@@ -92,12 +92,12 @@ export default function HealthPage() {
                   value: trend != null
                     ? `${trend > 0 ? '+' : ''}${trend.toFixed(1)}`
                     : '—',
-                  color: trend == null ? 'var(--fg-4)' : trend < 0 ? 'var(--ok)' : trend > 0 ? 'var(--hot)' : 'var(--fg-4)',
+                  color: trend == null ? 'var(--fg-2)' : trend < 0 ? 'var(--ok)' : trend > 0 ? 'var(--hot)' : 'var(--fg-2)',
                 },
               ].map(s => (
                 <div key={s.label} className="rounded p-2" style={{ background: 'var(--bg-2)' }}>
                   <div className="font-mono text-base font-bold" style={{ color: s.color }}>{s.value}</div>
-                  <div className="text-[9px] font-mono tracking-wider" style={{ color: 'var(--fg-4)' }}>{s.label}</div>
+                  <div className="text-[9px] font-mono tracking-wider" style={{ color: 'var(--fg-2)' }}>{s.label}</div>
                 </div>
               ))}
             </div>
@@ -113,14 +113,14 @@ export default function HealthPage() {
                   />
                   <XAxis
                     dataKey="date"
-                    tick={{ fontFamily: 'var(--font-mono)', fontSize: 9, fill: 'var(--fg-4)' }}
+                    tick={{ fontFamily: 'var(--font-mono)', fontSize: 9, fill: 'var(--fg-2)' }}
                     tickLine={false}
                     axisLine={false}
                     interval={Math.max(0, Math.floor(weightChartData.length / 6) - 1)}
                   />
                   <YAxis
                     domain={weightDomain}
-                    tick={{ fontFamily: 'var(--font-mono)', fontSize: 9, fill: 'var(--fg-4)' }}
+                    tick={{ fontFamily: 'var(--font-mono)', fontSize: 9, fill: 'var(--fg-2)' }}
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={v => `${v}`}
@@ -135,7 +135,7 @@ export default function HealthPage() {
                           borderRadius: 4,
                           padding: '6px 10px',
                         }}>
-                          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--fg-4)', marginBottom: 2 }}>
+                          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--fg-2)', marginBottom: 2 }}>
                             {label}
                           </p>
                           <p style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, color: 'var(--warn)' }}>
@@ -168,13 +168,13 @@ export default function HealthPage() {
 
         {loadingWeight && (
           <Panel title="Weight History">
-            <p className="font-mono text-xs" style={{ color: 'var(--fg-4)' }}>Loading…</p>
+            <p className="font-mono text-xs" style={{ color: 'var(--fg-2)' }}>Loading…</p>
           </Panel>
         )}
 
         {!loadingWeight && weights.length === 0 && (
           <Panel title="Weight History">
-            <p className="font-mono text-xs" style={{ color: 'var(--fg-4)' }}>
+            <p className="font-mono text-xs" style={{ color: 'var(--fg-2)' }}>
               No weight data yet. Log your weight in the Morning Routine.
             </p>
           </Panel>
@@ -193,7 +193,7 @@ export default function HealthPage() {
               ].map(s => (
                 <div key={s.label} className="rounded p-2" style={{ background: 'var(--bg-2)' }}>
                   <div className="font-mono text-lg font-bold" style={{ color: s.color }}>{s.value}</div>
-                  <div className="text-[9px] font-mono tracking-wider" style={{ color: 'var(--fg-4)' }}>{s.label}</div>
+                  <div className="text-[9px] font-mono tracking-wider" style={{ color: 'var(--fg-2)' }}>{s.label}</div>
                 </div>
               ))}
             </div>
@@ -203,15 +203,15 @@ export default function HealthPage() {
         {/* History table */}
         <Panel>
           {loadingWater ? (
-            <p className="text-xs font-mono" style={{ color: 'var(--fg-4)' }}>Loading…</p>
+            <p className="text-xs font-mono" style={{ color: 'var(--fg-2)' }}>Loading…</p>
           ) : loggedWaterDays.length === 0 ? (
-            <p className="text-xs font-mono" style={{ color: 'var(--fg-4)' }}>
+            <p className="text-xs font-mono" style={{ color: 'var(--fg-2)' }}>
               No water data yet. Log your first drink above.
             </p>
           ) : (
             <table className="w-full text-xs">
               <thead>
-                <tr style={{ color: 'var(--fg-4)' }}>
+                <tr style={{ color: 'var(--fg-2)' }}>
                   <th className="text-left font-mono text-[10px] uppercase tracking-widest pb-2">Date</th>
                   <th className="text-right font-mono text-[10px] uppercase tracking-widest pb-2">Total</th>
                   <th className="text-right font-mono text-[10px] uppercase tracking-widest pb-2">%</th>

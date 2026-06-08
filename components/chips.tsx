@@ -8,14 +8,14 @@ export const WHERE: Record<string, { label: string; color: string }> = {
   'calls':     { label: 'CALLS',     color: 'oklch(0.74 0.15 200)' },
   'errands':   { label: 'ERRANDS',   color: 'oklch(0.74 0.16 70)' },
   'home':      { label: 'HOME',      color: 'oklch(0.66 0.05 255)' },
-  'anywhere':  { label: 'ANYWHERE',  color: 'var(--fg-4)' },
+  'anywhere':  { label: 'ANYWHERE',  color: 'var(--fg-2)' },
 }
 
 export function priorityBadge(score: number): { label: string; color: string; filled: boolean } {
   if (score >= 67) return { label: 'HIGH', color: 'var(--hot)', filled: true }
   if (score >= 34) return { label: 'MED',  color: 'var(--warn)', filled: false }
   if (score >= 1)  return { label: 'LOW',  color: 'var(--accent)', filled: false }
-  return { label: 'NO PRIORITY', color: 'var(--fg-4)', filled: false }
+  return { label: 'NO PRIORITY', color: 'var(--fg-2)', filled: false }
 }
 
 export function splitTags(tags: string[]) {

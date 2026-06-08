@@ -200,7 +200,7 @@ export function TopRail() {
               </span>
               <span
                 className="text-[10px] tabular-nums"
-                style={{ fontFamily: 'var(--font-mono)', color: item.value === '—' ? 'var(--fg-4)' : 'var(--fg)' }}
+                style={{ fontFamily: 'var(--font-mono)', color: item.value === '—' ? 'var(--fg-2)' : 'var(--fg)' }}
               >
                 {item.value}
               </span>
@@ -212,7 +212,7 @@ export function TopRail() {
                   {item.change}
                 </span>
               )}
-              <span style={{ color: 'var(--fg-4)', fontSize: '10px' }}>·</span>
+              <span style={{ color: 'var(--fg-2)', fontSize: '10px' }}>·</span>
             </span>
           ))}
         </div>

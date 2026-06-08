@@ -86,7 +86,7 @@ export default function TaskHistoryPage() {
         </div>
 
         {loading ? (
-          <p className="text-xs py-8 text-center" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-4)' }}>LOADING…</p>
+          <p className="text-xs py-8 text-center" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)' }}>LOADING…</p>
         ) : (
           <Panel index={1} title={`Completed · ${weekTotal}`} status={weekTotal ? 'online' : 'none'}>
             <div className="flex flex-col gap-4">
@@ -104,16 +104,16 @@ export default function TaskHistoryPage() {
                         {fmt(day, { weekday: 'long' }).toUpperCase()} · {fmt(day, { month: 'short', day: 'numeric' })}
                       </span>
                       <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-4)' }}>{dayTasks.length}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-2)' }}>{dayTasks.length}</span>
                     </div>
                     {dayTasks.length === 0 ? (
-                      <p className="text-[11px] pl-1" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-4)' }}>
+                      <p className="text-[11px] pl-1" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)' }}>
                         {isFuture ? '—' : 'no tasks completed'}
                       </p>
                     ) : (
                       dayTasks.map(t => {
                         const { ctx, topical } = splitTags(t.tags ?? [])
-                        const where = ctx ? (WHERE[ctx] ?? { label: ctx.toUpperCase(), color: 'var(--fg-4)' }) : null
+                        const where = ctx ? (WHERE[ctx] ?? { label: ctx.toUpperCase(), color: 'var(--fg-2)' }) : null
                         const prio = priorityBadge(t.priority_score)
                         return (
                           <div key={t.id} className="flex items-start gap-2.5 pl-1">
@@ -121,16 +121,16 @@ export default function TaskHistoryPage() {
                               <svg width="8" height="6" viewBox="0 0 8 6" fill="none"><path d="M1 3L3 5L7 1" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                             </div>
                             <div className="flex-1 min-w-0 flex flex-col gap-1">
-                              <span className="text-xs" style={{ color: 'var(--fg-2)', textDecoration: 'line-through', textDecorationColor: 'var(--fg-4)' }}>{t.title}</span>
+                              <span className="text-xs" style={{ color: 'var(--fg-2)', textDecoration: 'line-through', textDecorationColor: 'var(--fg-2)' }}>{t.title}</span>
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <Chip label={prio.label} color={prio.color} filled={prio.filled} />
                                 {where && <Chip label={where.label} color={where.color} />}
                                 {topical.map(tag => (
-                                  <span key={tag} style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--fg-4)' }}>#{tag}</span>
+                                  <span key={tag} style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--fg-2)' }}>#{tag}</span>
                                 ))}
                               </div>
                             </div>
-                            <span className="shrink-0 tabular-nums" style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-4)' }}>
+                            <span className="shrink-0 tabular-nums" style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-2)' }}>
                               {new Date(t.completed_at!).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                             </span>
                           </div>

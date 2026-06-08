@@ -136,7 +136,7 @@ export function CaptureBox() {
             className="text-[10px] font-semibold shrink-0 mb-1.5 select-none"
             style={{
               fontFamily: 'var(--font-mono)',
-              color: expanded ? 'var(--accent)' : 'var(--fg-4)',
+              color: expanded ? 'var(--accent)' : 'var(--fg-2)',
               transition: 'color 200ms',
             }}
           >
@@ -166,7 +166,7 @@ export function CaptureBox() {
             style={{
               fontFamily: 'var(--font-mono)',
               background: text.trim() ? 'var(--accent)' : 'var(--bg-3)',
-              color: text.trim() ? 'oklch(0.09 0.008 255)' : 'var(--fg-4)',
+              color: text.trim() ? 'oklch(0.09 0.008 255)' : 'var(--fg-2)',
               boxShadow: text.trim() ? '0 0 12px var(--accent-dim)' : 'none',
               transition: 'background 200ms, box-shadow 200ms, transform 150ms',
             }}
@@ -183,7 +183,7 @@ export function CaptureBox() {
                 {k.toUpperCase()}
               </span>
             ))}
-            <span className="ml-auto text-[9px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-4)' }}>AI routes automatically</span>
+            <span className="ml-auto text-[9px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)' }}>AI routes automatically</span>
           </div>
         )}
       </div>

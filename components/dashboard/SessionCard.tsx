@@ -49,7 +49,7 @@ export function SessionCard() {
             onClick={refreshPlan}
             disabled={refreshing}
             className="card-label hover:opacity-70 transition-opacity"
-            style={{ color: 'var(--fg-4)' }}
+            style={{ color: 'var(--fg-2)' }}
           >
             {refreshing ? 'planning…' : '↻ replan'}
           </button>
@@ -62,7 +62,7 @@ export function SessionCard() {
 
         {/* Daily plan */}
         {planLoading ? (
-          <div className="flex items-center gap-2 py-2" style={{ color: 'var(--fg-4)' }}>
+          <div className="flex items-center gap-2 py-2" style={{ color: 'var(--fg-2)' }}>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>BUILDING YOUR DAY</span>
             <span className="animate-pulse">▋</span>
           </div>
@@ -71,7 +71,7 @@ export function SessionCard() {
             <Markdown text={plan} />
           </div>
         ) : (
-          <p className="text-xs" style={{ color: 'var(--fg-4)' }}>
+          <p className="text-xs" style={{ color: 'var(--fg-2)' }}>
             Couldn&apos;t build a plan — add tasks and connect your calendar, then hit replan.
           </p>
         )}
@@ -183,7 +183,7 @@ function SessionChat({ plan, onClose }: { plan: string; onClose: () => void }) {
             <span className="card-label dot-online" style={{ color: 'var(--ok)' }}>●</span>
             <span className="card-label" style={{ color: 'var(--fg-2)' }}>DAILY SESSION</span>
           </div>
-          <button onClick={onClose} className="card-label hover:opacity-70 transition-opacity" style={{ color: 'var(--fg-4)' }}>
+          <button onClick={onClose} className="card-label hover:opacity-70 transition-opacity" style={{ color: 'var(--fg-2)' }}>
             ESC ✕
           </button>
         </div>
@@ -212,7 +212,7 @@ function SessionChat({ plan, onClose }: { plan: string; onClose: () => void }) {
                 }}
               >
                 {m.role === 'assistant'
-                  ? (m.content ? <Markdown text={m.content} /> : <span className="animate-pulse" style={{ color: 'var(--fg-4)' }}>▋</span>)
+                  ? (m.content ? <Markdown text={m.content} /> : <span className="animate-pulse" style={{ color: 'var(--fg-2)' }}>▋</span>)
                   : m.content}
               </div>
             </div>

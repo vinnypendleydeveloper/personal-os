@@ -60,7 +60,7 @@ export function HabitsCard() {
   return (
     <Panel index={3} title={`Habits · ${count}/${total}`} delay={120} action={
       syncing
-        ? <span className="card-label" style={{ color: 'var(--fg-4)' }}>saving</span>
+        ? <span className="card-label" style={{ color: 'var(--fg-2)' }}>saving</span>
         : allDone
         ? <span className="card-label dot-online" style={{ color: 'var(--ok)' }}>COMPLETE ●</span>
         : null
@@ -111,7 +111,7 @@ export function HabitsCard() {
                 style={{
                   color: checked ? 'var(--fg-3)' : 'var(--fg-2)',
                   textDecoration: checked ? 'line-through' : 'none',
-                  textDecorationColor: 'var(--fg-4)',
+                  textDecorationColor: 'var(--fg-2)',
                 }}
               >
                 {habit}

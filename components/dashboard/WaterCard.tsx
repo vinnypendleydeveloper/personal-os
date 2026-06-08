@@ -21,6 +21,10 @@ export function WaterCard() {
   const [flash, setFlash] = useState(false)
 
   useEffect(() => {
+    console.log('[WaterCard] entries:', entries)
+  }, [entries])
+
+  useEffect(() => {
     fetch(`/api/water?date=${today}`)
       .then(r => r.json())
       .then(d => {
@@ -89,8 +93,8 @@ export function WaterCard() {
     <button
       onClick={undoLast}
       disabled={logging}
-      className="font-mono text-[10px] disabled:opacity-40 transition-opacity hover:opacity-70"
-      style={{ color: 'var(--fg-4)', letterSpacing: '0.06em' }}
+      className="font-mono text-xs disabled:opacity-40 transition-opacity hover:opacity-70"
+      style={{ color: 'var(--fg-2)', letterSpacing: '0.06em' }}
       title={`Undo last entry (${lastEntry?.amount_ml}ml)`}
     >
       ↩ {lastEntry?.amount_ml}ml
@@ -121,7 +125,7 @@ export function WaterCard() {
             {Math.round(pct)}%
           </div>
           {!done && (
-            <div className="font-mono text-[10px]" style={{ color: 'var(--fg-4)' }}>
+            <div className="font-mono text-[10px]" style={{ color: 'var(--fg-2)' }}>
               {remaining.toLocaleString()} left
             </div>
           )}
@@ -163,7 +167,7 @@ export function WaterCard() {
         />
       </div>
 
-      <div className="font-mono text-[10px]" style={{ color: 'var(--fg-4)' }}>
+      <div className="font-mono text-[10px]" style={{ color: 'var(--fg-2)' }}>
         {totalMl.toLocaleString()} / {GOAL_ML.toLocaleString()} ml
       </div>
 

@@ -50,7 +50,7 @@ function LoginForm() {
             </span>
             <span className="dot-online text-[10px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--ok)' }}>●</span>
           </div>
-          <p className="text-[11px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-4)', letterSpacing: '0.1em' }}>
+          <p className="text-[11px]" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)', letterSpacing: '0.1em' }}>
             AUTHENTICATION REQUIRED
           </p>
         </div>
@@ -69,14 +69,14 @@ function LoginForm() {
             <div className="flex flex-col gap-1.5">
               <label
                 className="text-[10px] tracking-wider"
-                style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-4)' }}
+                style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)' }}
               >
                 PASSWORD
               </label>
               <div className="relative">
                 <span
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] select-none"
-                  style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-4)' }}
+                  style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)' }}
                 >
                   &gt;
                 </span>
@@ -125,7 +125,7 @@ function LoginForm() {
 
         <p
           className="text-center text-[10px] mt-4"
-          style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-4)' }}
+          style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)' }}
         >
           VINNY PENDLEY · PERSONAL OS v1.0
         </p>

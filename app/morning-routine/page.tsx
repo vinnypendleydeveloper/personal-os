@@ -91,7 +91,7 @@ function WeightInput({ onSaved }: { onSaved: (logged: boolean) => void }) {
           />
           <span
             className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs pointer-events-none"
-            style={{ color: 'var(--fg-4)' }}
+            style={{ color: 'var(--fg-2)' }}
           >
             lbs
           </span>
@@ -113,7 +113,7 @@ function WeightInput({ onSaved }: { onSaved: (logged: boolean) => void }) {
         </p>
       )}
       {!error && saved != null && !dirty && (
-        <p className="font-mono text-[10px]" style={{ color: 'var(--fg-4)' }}>
+        <p className="font-mono text-[10px]" style={{ color: 'var(--fg-2)' }}>
           Today's log: {saved.toFixed(1)} lbs · click the field to update
         </p>
       )}
@@ -234,10 +234,10 @@ export default function MorningRoutinePage() {
           </h1>
           <div className="flex items-center gap-1.5" title="Days in a row you've completed the full routine">
             <span style={{ fontSize: 14 }}>🔥</span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 800, color: streak > 0 ? 'oklch(0.74 0.16 70)' : 'var(--fg-4)' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 800, color: streak > 0 ? 'oklch(0.74 0.16 70)' : 'var(--fg-2)' }}>
               {streak}
             </span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--fg-4)', letterSpacing: '0.1em' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--fg-2)', letterSpacing: '0.1em' }}>
               DAY{streak === 1 ? '' : 'S'}
             </span>
           </div>
@@ -260,7 +260,7 @@ export default function MorningRoutinePage() {
           </div>
 
           {loading ? (
-            <p className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-4)' }}>LOADING…</p>
+            <p className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)' }}>LOADING…</p>
           ) : (
             <div className="flex flex-col gap-1 mt-1">
               {items.map((item, idx) => {
@@ -288,7 +288,7 @@ export default function MorningRoutinePage() {
                     </span>
 
                     {/* Index */}
-                    <span className="shrink-0 w-4 text-right tabular-nums" style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-4)' }}>
+                    <span className="shrink-0 w-4 text-right tabular-nums" style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-2)' }}>
                       {idx + 1}
                     </span>
 
@@ -327,9 +327,9 @@ export default function MorningRoutinePage() {
                         onClick={() => { setEditDraft(item.label); setEditingId(item.id) }}
                         className="flex-1 text-sm cursor-text transition-all duration-200 min-w-0"
                         style={{
-                          color: done ? 'var(--fg-4)' : 'var(--fg)',
+                          color: done ? 'var(--fg-2)' : 'var(--fg)',
                           textDecoration: done ? 'line-through' : 'none',
-                          textDecorationColor: 'var(--fg-4)',
+                          textDecorationColor: 'var(--fg-2)',
                         }}
                         title="Click to rename"
                       >
@@ -379,7 +379,7 @@ export default function MorningRoutinePage() {
           )}
         </Panel>
 
-        <p className="text-[10px] text-center" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-4)' }}>
+        <p className="text-[10px] text-center" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)' }}>
           Drag ⠿ to reorder · click a step to rename · completions reset at midnight
         </p>
       </div>

@@ -21,7 +21,7 @@ export function Panel({ children, className = '', title, index, status, action, 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             {index !== undefined && (
-              <span className="card-label" style={{ color: 'var(--fg-4)' }}>
+              <span className="card-label" style={{ color: 'var(--fg-2)' }}>
                 {String(index).padStart(2, '0')} //
               </span>
             )}

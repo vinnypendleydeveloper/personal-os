@@ -40,14 +40,14 @@ export function WeightCard() {
 
   return (
     <Panel index={9} title="Weight" action={
-      <Link href="/weight" className="font-mono text-[10px] hover:brightness-125 transition-all" style={{ color: 'var(--fg-4)' }}>
+      <Link href="/weight" className="font-mono text-[10px] hover:brightness-125 transition-all" style={{ color: 'var(--fg-2)' }}>
         ALL →
       </Link>
     }>
       <div className="flex items-end justify-between">
         <div className="flex items-baseline gap-1.5">
           {loading ? (
-            <span className="font-mono text-sm" style={{ color: 'var(--fg-4)' }}>—</span>
+            <span className="font-mono text-sm" style={{ color: 'var(--fg-2)' }}>—</span>
           ) : weight != null ? (
             <>
               <span className="font-mono font-bold" style={{ fontSize: '2rem', lineHeight: 1, color: 'var(--warn)' }}>
@@ -56,13 +56,13 @@ export function WeightCard() {
               <span className="font-mono text-xs" style={{ color: 'var(--fg-3)' }}>lbs</span>
             </>
           ) : (
-            <span className="font-mono text-sm" style={{ color: 'var(--fg-4)' }}>not logged</span>
+            <span className="font-mono text-sm" style={{ color: 'var(--fg-2)' }}>not logged</span>
           )}
         </div>
         {delta != null && (
           <span
             className="font-mono text-xs font-semibold"
-            style={{ color: delta < 0 ? 'var(--ok)' : delta > 0 ? 'var(--hot)' : 'var(--fg-4)' }}
+            style={{ color: delta < 0 ? 'var(--ok)' : delta > 0 ? 'var(--hot)' : 'var(--fg-2)' }}
           >
             {delta > 0 ? '▲' : delta < 0 ? '▼' : '—'} {Math.abs(delta).toFixed(1)}
           </span>
@@ -105,7 +105,7 @@ export function WeightCard() {
       )}
 
       {!loading && chartData.length === 0 && (
-        <p className="font-mono text-[10px]" style={{ color: 'var(--fg-4)' }}>
+        <p className="font-mono text-[10px]" style={{ color: 'var(--fg-2)' }}>
           Log weight in Morning Routine
         </p>
       )}

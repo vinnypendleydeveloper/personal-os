@@ -149,7 +149,7 @@ export default function GymLogPage() {
                     background: d.rest ? 'var(--bg-2)' : 'var(--accent-dim)',
                     border: `1px solid ${d.rest ? 'var(--border)' : 'var(--accent-glow)'}`,
                   }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: d.rest ? 'var(--fg-4)' : 'var(--accent)' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: d.rest ? 'var(--fg-2)' : 'var(--accent)' }}>
                     DAY {d.day}
                   </span>
                   <span className="text-sm font-medium" style={{ color: 'var(--fg)' }}>{d.label}</span>
@@ -161,7 +161,7 @@ export default function GymLogPage() {
           <>
             {/* Header with chosen day */}
             <Panel index={1} title={`Day ${def!.day} · ${def!.label}`} status="online" action={
-              <button onClick={() => { setSelectedDay(null) }} className="card-label hover:opacity-70" style={{ color: 'var(--fg-4)' }}>
+              <button onClick={() => { setSelectedDay(null) }} className="card-label hover:opacity-70" style={{ color: 'var(--fg-2)' }}>
                 ↺ change day
               </button>
             }>
@@ -171,7 +171,7 @@ export default function GymLogPage() {
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ok)' }}>↑ {summary.up} improved</span>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--fg-3)' }}>= {summary.same} held</span>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--warn)' }}>↓ {summary.down} down</span>
-                  {summary.comparedTo && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-4)', marginLeft: 'auto' }}>vs {summary.comparedTo}</span>}
+                  {summary.comparedTo && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-2)', marginLeft: 'auto' }}>vs {summary.comparedTo}</span>}
                 </div>
               )}
               {def!.rest && (
@@ -189,7 +189,7 @@ export default function GymLogPage() {
                 <Panel key={group} title={group} action={
                   isAbsGroup && !absDue ? (
                     <button onClick={() => setAbsIncluded(v => !v)} className="card-label hover:opacity-70"
-                      style={{ color: absIncluded ? 'var(--ok)' : 'var(--fg-4)' }}>
+                      style={{ color: absIncluded ? 'var(--ok)' : 'var(--fg-2)' }}>
                       {absIncluded ? '✓ included' : 'REST DAY · include anyway'}
                     </button>
                   ) : null
@@ -209,10 +209,10 @@ export default function GymLogPage() {
                                 {included && <span style={{ fontSize: 9, color: 'var(--bg)' }}>✓</span>}
                               </button>
                             )}
-                            <span className="text-sm font-medium" style={{ color: included ? 'var(--fg)' : 'var(--fg-4)' }}>
-                              {ex.name}{isOpt && <span style={{ fontSize: 10, color: 'var(--fg-4)' }}> (optional)</span>}
+                            <span className="text-sm font-medium" style={{ color: included ? 'var(--fg)' : 'var(--fg-2)' }}>
+                              {ex.name}{isOpt && <span style={{ fontSize: 10, color: 'var(--fg-2)' }}> (optional)</span>}
                             </span>
-                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-4)' }}>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-2)' }}>
                               {ex.sets}× · {ex.target}
                             </span>
                             {prog && saved && (
@@ -225,11 +225,11 @@ export default function GymLogPage() {
                             <div className="flex flex-col gap-1 pl-0.5">
                               {(entries[ex.name] ?? []).map((s, i) => (
                                 <div key={i} className="flex items-center gap-2">
-                                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-4)', width: 38 }}>SET {i + 1}</span>
+                                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-2)', width: 38 }}>SET {i + 1}</span>
                                   {ex.unit === 'weight' && (
                                     <>
                                       <NumInput value={s.weight} onChange={v => setVal(ex.name, i, 'weight', v)} placeholder="lbs" />
-                                      <span style={{ color: 'var(--fg-4)', fontSize: 11 }}>×</span>
+                                      <span style={{ color: 'var(--fg-2)', fontSize: 11 }}>×</span>
                                       <NumInput value={s.reps} onChange={v => setVal(ex.name, i, 'reps', v)} placeholder="reps" />
                                     </>
                                   )}
@@ -267,7 +267,7 @@ export default function GymLogPage() {
                         style={{
                           fontFamily: 'var(--font-mono)',
                           background: sauna === v ? (v ? 'var(--ok-dim)' : 'var(--bg-3)') : 'var(--bg-2)',
-                          color: sauna === v ? (v ? 'var(--ok)' : 'var(--fg-2)') : 'var(--fg-4)',
+                          color: sauna === v ? (v ? 'var(--ok)' : 'var(--fg-2)') : 'var(--fg-2)',
                           border: `1px solid ${sauna === v ? (v ? 'var(--ok)' : 'var(--fg-3)') : 'var(--border)'}`,
                         }}>{v ? 'YES' : 'NO'}</button>
                     ))}

@@ -103,7 +103,7 @@ export default function WeightPage() {
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: '1.75rem', fontWeight: 800, color: 'var(--warn)', lineHeight: 1 }}>
                 {current.toFixed(1)}
               </span>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--fg-4)' }}>lbs</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--fg-2)' }}>lbs</span>
             </div>
           )}
         </div>
@@ -133,7 +133,7 @@ export default function WeightPage() {
                   transition: 'border-color 200ms, box-shadow 200ms',
                 }}
               />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs pointer-events-none" style={{ color: 'var(--fg-4)' }}>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs pointer-events-none" style={{ color: 'var(--fg-2)' }}>
                 lbs
               </span>
             </div>
@@ -150,7 +150,7 @@ export default function WeightPage() {
           </div>
           {error && <p className="font-mono text-[10px]" style={{ color: 'var(--hot)' }}>{error}</p>}
           {!error && saved != null && !dirty && (
-            <p className="font-mono text-[10px]" style={{ color: 'var(--fg-4)' }}>
+            <p className="font-mono text-[10px]" style={{ color: 'var(--fg-2)' }}>
               {saved.toFixed(1)} lbs logged today · click to update
             </p>
           )}
@@ -166,12 +166,12 @@ export default function WeightPage() {
               {
                 label: inWindow ? '30D TREND' : 'TREND',
                 value: trend != null ? `${trend > 0 ? '+' : ''}${trend.toFixed(1)}` : '—',
-                color: trend == null ? 'var(--fg-4)' : trend < 0 ? 'var(--ok)' : trend > 0 ? 'var(--hot)' : 'var(--fg-4)',
+                color: trend == null ? 'var(--fg-2)' : trend < 0 ? 'var(--ok)' : trend > 0 ? 'var(--hot)' : 'var(--fg-2)',
               },
             ].map(s => (
               <div key={s.label} className="rounded p-3 text-center" style={{ background: 'var(--bg-2)', border: '1px solid var(--border)' }}>
                 <div className="font-mono text-base font-bold" style={{ color: s.color }}>{s.value}</div>
-                <div className="text-[9px] font-mono tracking-wider mt-0.5" style={{ color: 'var(--fg-4)' }}>{s.label}</div>
+                <div className="text-[9px] font-mono tracking-wider mt-0.5" style={{ color: 'var(--fg-2)' }}>{s.label}</div>
               </div>
             ))}
           </div>
@@ -180,9 +180,9 @@ export default function WeightPage() {
         {/* History chart */}
         <Panel title="History">
           {loading ? (
-            <p className="font-mono text-xs" style={{ color: 'var(--fg-4)' }}>Loading…</p>
+            <p className="font-mono text-xs" style={{ color: 'var(--fg-2)' }}>Loading…</p>
           ) : chartData.length < 2 ? (
-            <p className="font-mono text-xs" style={{ color: 'var(--fg-4)' }}>
+            <p className="font-mono text-xs" style={{ color: 'var(--fg-2)' }}>
               {chartData.length === 0 ? 'No entries yet. Log your first weight above.' : 'Log at least 2 days to see the chart.'}
             </p>
           ) : (
@@ -192,14 +192,14 @@ export default function WeightPage() {
                   <CartesianGrid strokeDasharray="2 4" stroke="oklch(1 0 0 / 0.05)" vertical={false} />
                   <XAxis
                     dataKey="date"
-                    tick={{ fontFamily: 'var(--font-mono)', fontSize: 9, fill: 'var(--fg-4)' }}
+                    tick={{ fontFamily: 'var(--font-mono)', fontSize: 9, fill: 'var(--fg-2)' }}
                     tickLine={false}
                     axisLine={false}
                     interval={Math.max(0, Math.floor(chartData.length / 6) - 1)}
                   />
                   <YAxis
                     domain={weightDomain}
-                    tick={{ fontFamily: 'var(--font-mono)', fontSize: 9, fill: 'var(--fg-4)' }}
+                    tick={{ fontFamily: 'var(--font-mono)', fontSize: 9, fill: 'var(--fg-2)' }}
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={v => `${v}`}
@@ -209,7 +209,7 @@ export default function WeightPage() {
                       if (!active || !payload?.length) return null
                       return (
                         <div style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 4, padding: '6px 10px' }}>
-                          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--fg-4)', marginBottom: 2 }}>{label}</p>
+                          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--fg-2)', marginBottom: 2 }}>{label}</p>
                           <p style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, color: 'var(--warn)' }}>
                             {Number(payload[0].value).toFixed(1)} lbs
                           </p>
@@ -244,7 +244,7 @@ export default function WeightPage() {
                     <th
                       key={h}
                       className={`font-mono text-[10px] uppercase tracking-widest pb-2 ${i > 0 ? 'text-right' : 'text-left'}`}
-                      style={{ color: 'var(--fg-4)' }}
+                      style={{ color: 'var(--fg-2)' }}
                     >
                       {h}
                     </th>
@@ -265,7 +265,7 @@ export default function WeightPage() {
                         {entry.weight_lbs.toFixed(1)} lbs
                       </td>
                       <td className="py-1.5 text-right font-mono text-[11px]" style={{
-                        color: delta == null ? 'var(--fg-4)' : delta < 0 ? 'var(--ok)' : delta > 0 ? 'var(--hot)' : 'var(--fg-4)',
+                        color: delta == null ? 'var(--fg-2)' : delta < 0 ? 'var(--ok)' : delta > 0 ? 'var(--hot)' : 'var(--fg-2)',
                       }}>
                         {delta == null ? '—' : `${delta > 0 ? '▲' : '▼'} ${Math.abs(delta).toFixed(1)}`}
                       </td>

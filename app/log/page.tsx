@@ -81,11 +81,11 @@ export default function DailyLogPage() {
             <h1 style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 700, color: 'var(--fg)', letterSpacing: '0.02em' }}>
               {fmtHeader(date)}
             </h1>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-4)' }}>{date}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-2)' }}>{date}</span>
           </div>
 
           {loading || !data ? (
-            <p className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-4)' }}>LOADING…</p>
+            <p className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)' }}>LOADING…</p>
           ) : (
             <div className="flex flex-col gap-5 mt-2">
 
@@ -93,14 +93,14 @@ export default function DailyLogPage() {
               <div>
                 <SectionLabel>◢ MORNING ROUTINE · {data.routine.done.length}/{data.routine.total}</SectionLabel>
                 {data.routine.done.length === 0 ? (
-                  <p className="text-xs" style={{ color: 'var(--fg-4)' }}>Nothing logged.</p>
+                  <p className="text-xs" style={{ color: 'var(--fg-2)' }}>Nothing logged.</p>
                 ) : (
                   <div className="flex flex-wrap gap-x-4 gap-y-1">
                     {data.routine.done.map(x => (
                       <span key={x} className="text-xs" style={{ color: 'var(--fg-2)' }}>✓ {x}</span>
                     ))}
                     {data.routine.missed.map(x => (
-                      <span key={x} className="text-xs" style={{ color: 'var(--fg-4)', textDecoration: 'line-through' }}>{x}</span>
+                      <span key={x} className="text-xs" style={{ color: 'var(--fg-2)', textDecoration: 'line-through' }}>{x}</span>
                     ))}
                   </div>
                 )}
@@ -110,20 +110,20 @@ export default function DailyLogPage() {
               <div>
                 <SectionLabel>◢ TASKS COMPLETED · {data.tasks.length}</SectionLabel>
                 {data.tasks.length === 0 ? (
-                  <p className="text-xs" style={{ color: 'var(--fg-4)' }}>No tasks completed.</p>
+                  <p className="text-xs" style={{ color: 'var(--fg-2)' }}>No tasks completed.</p>
                 ) : (
                   <div className="flex flex-col gap-1.5">
                     {data.tasks.map((t, i) => {
                       const { ctx, topical } = splitTags(t.tags ?? [])
-                      const where = ctx ? (WHERE[ctx] ?? { label: ctx.toUpperCase(), color: 'var(--fg-4)' }) : null
+                      const where = ctx ? (WHERE[ctx] ?? { label: ctx.toUpperCase(), color: 'var(--fg-2)' }) : null
                       const prio = priorityBadge(t.priority_score)
                       return (
                         <div key={i} className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs" style={{ color: 'var(--fg-2)' }}>✓ {t.title}</span>
                           <Chip label={prio.label} color={prio.color} filled={prio.filled} />
                           {where && <Chip label={where.label} color={where.color} />}
-                          {topical.map(tag => <span key={tag} style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--fg-4)' }}>#{tag}</span>)}
-                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--fg-4)', marginLeft: 'auto' }}>
+                          {topical.map(tag => <span key={tag} style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--fg-2)' }}>#{tag}</span>)}
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--fg-2)', marginLeft: 'auto' }}>
                             {new Date(t.completed_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                           </span>
                         </div>
@@ -138,7 +138,7 @@ export default function DailyLogPage() {
                 <SectionLabel>◢ HABITS · {data.habits.hit.length}/{data.habits.hit.length + data.habits.missed.length}</SectionLabel>
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
                   {data.habits.hit.map(h => <span key={h} className="text-xs" style={{ color: 'var(--ok)' }}>✓ {h}</span>)}
-                  {data.habits.missed.map(h => <span key={h} className="text-xs" style={{ color: 'var(--fg-4)' }}>✗ {h}</span>)}
+                  {data.habits.missed.map(h => <span key={h} className="text-xs" style={{ color: 'var(--fg-2)' }}>✗ {h}</span>)}
                 </div>
               </div>
 
@@ -148,12 +148,12 @@ export default function DailyLogPage() {
                 {data.gym ? (
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs" style={{ color: 'var(--fg-2)' }}>Day {data.gym.day} · {data.gym.label}</span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-4)' }}>{data.gym.exercises.length} exercises</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-2)' }}>{data.gym.exercises.length} exercises</span>
                     {typeof data.gym.whoop_strain === 'number' && <Chip label={`STRAIN ${data.gym.whoop_strain}`} color="oklch(0.74 0.15 200)" />}
                     {data.gym.sauna && <Chip label="SAUNA" color="var(--ok)" />}
                   </div>
                 ) : (
-                  <p className="text-xs" style={{ color: 'var(--fg-4)' }}>No gym session logged.</p>
+                  <p className="text-xs" style={{ color: 'var(--fg-2)' }}>No gym session logged.</p>
                 )}
               </div>
 

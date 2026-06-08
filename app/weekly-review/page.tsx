@@ -49,7 +49,7 @@ const WHEN: Record<string, { label: string; color: string }> = {
   today:      { label: 'TODAY',     color: 'var(--hot)' },
   this_week:  { label: 'THIS WEEK', color: 'var(--warn)' },
   this_month: { label: 'THIS MO',   color: 'var(--accent)' },
-  someday:    { label: 'SOMEDAY',   color: 'var(--fg-4)' },
+  someday:    { label: 'SOMEDAY',   color: 'var(--fg-2)' },
 }
 const WHERE: Record<string, { label: string; color: string }> = {
   'deep-work': { label: 'DEEP WORK', color: 'oklch(0.70 0.16 250)' },
@@ -59,13 +59,13 @@ const WHERE: Record<string, { label: string; color: string }> = {
   'calls':     { label: 'CALLS',     color: 'oklch(0.74 0.15 200)' },
   'errands':   { label: 'ERRANDS',   color: 'oklch(0.74 0.16 70)' },
   'home':      { label: 'HOME',      color: 'oklch(0.66 0.05 255)' },
-  'anywhere':  { label: 'ANYWHERE',  color: 'var(--fg-4)' },
+  'anywhere':  { label: 'ANYWHERE',  color: 'var(--fg-2)' },
 }
 function priorityColor(s: number) {
   if (s >= 90) return 'var(--hot)'
   if (s >= 70) return 'var(--warn)'
   if (s >= 40) return 'var(--accent)'
-  return 'var(--fg-4)'
+  return 'var(--fg-2)'
 }
 function splitTags(tags: string[]) {
   const ctx = tags?.find(t => t.startsWith('@'))?.slice(1) ?? null
@@ -185,7 +185,7 @@ export default function WeeklyReviewPage() {
         </div>
 
         {loading ? (
-          <div className="text-xs py-8 text-center" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-4)' }}>
+          <div className="text-xs py-8 text-center" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)' }}>
             LOADING WEEK…
           </div>
         ) : (
@@ -194,7 +194,7 @@ export default function WeeklyReviewPage() {
             {/* WINS */}
             <Panel index={1} title={`Wins · ${wins.length}`} status={wins.length ? 'online' : 'none'}>
               {wins.length === 0 ? (
-                <p className="text-xs" style={{ color: 'var(--fg-4)' }}>No tasks completed this week yet.</p>
+                <p className="text-xs" style={{ color: 'var(--fg-2)' }}>No tasks completed this week yet.</p>
               ) : (
                 <div className="flex flex-col">
                   {wins.map((t, i) => {
@@ -205,14 +205,14 @@ export default function WeeklyReviewPage() {
                           <svg width="8" height="6" viewBox="0 0 8 6" fill="none"><path d="M1 3L3 5L7 1" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                         </div>
                         <div className="flex-1 min-w-0 flex flex-col gap-1">
-                          <p className="text-xs leading-snug" style={{ color: 'var(--fg-2)', textDecoration: 'line-through', textDecorationColor: 'var(--fg-4)' }}>{t.title}</p>
+                          <p className="text-xs leading-snug" style={{ color: 'var(--fg-2)', textDecoration: 'line-through', textDecorationColor: 'var(--fg-2)' }}>{t.title}</p>
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {ctx && WHERE[ctx] && <Chip label={WHERE[ctx].label} color={WHERE[ctx].color} />}
                             {topical.map(tag => (
-                              <span key={tag} style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--fg-4)' }}>#{tag}</span>
+                              <span key={tag} style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--fg-2)' }}>#{tag}</span>
                             ))}
                             {t.completed_at && (
-                              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--fg-4)', marginLeft: 'auto' }}>
+                              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--fg-2)', marginLeft: 'auto' }}>
                                 {new Date(t.completed_at).toLocaleDateString('en-US', { weekday: 'short' })}
                               </span>
                             )}
@@ -228,7 +228,7 @@ export default function WeeklyReviewPage() {
             {/* OPEN LOOPS */}
             <Panel index={2} title={`Open Loops · ${openLoops.length}`} status={openLoops.length ? 'live' : 'none'}>
               {openLoops.length === 0 ? (
-                <p className="text-xs" style={{ color: 'var(--fg-4)' }}>No open loops. Clean slate.</p>
+                <p className="text-xs" style={{ color: 'var(--fg-2)' }}>No open loops. Clean slate.</p>
               ) : (
                 <div className="flex flex-col" style={{ maxHeight: 360, overflowY: 'auto' }}>
                   {openLoops.map((t, i) => {
@@ -270,7 +270,7 @@ export default function WeeklyReviewPage() {
                           const isToday = dateKey(d) === dateKey(today)
                           return (
                             <th key={dateKey(d)} style={{ padding: '4px 0 8px', textAlign: 'center' }}>
-                              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: isToday ? 'var(--accent)' : 'var(--fg-4)', letterSpacing: '0.05em' }}>
+                              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: isToday ? 'var(--accent)' : 'var(--fg-2)', letterSpacing: '0.05em' }}>
                                 {d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()}
                               </div>
                               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: isToday ? 'var(--accent)' : 'var(--fg-3)' }}>
@@ -280,7 +280,7 @@ export default function WeeklyReviewPage() {
                           )
                         })}
                         <th style={{ padding: '4px 0 8px 12px', textAlign: 'right' }}>
-                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--fg-4)' }}>HIT</span>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--fg-2)' }}>HIT</span>
                         </th>
                       </tr>
                     </thead>
@@ -316,14 +316,14 @@ export default function WeeklyReviewPage() {
                       {/* Per-day totals */}
                       <tr>
                         <td style={{ padding: '8px 10px 0 0' }}>
-                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--fg-4)', letterSpacing: '0.05em' }}>DAY</span>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--fg-2)', letterSpacing: '0.05em' }}>DAY</span>
                         </td>
                         {days.map(d => {
                           const future = d > today
                           const n = dayHitCount(d)
                           return (
                             <td key={dateKey(d)} style={{ textAlign: 'center', padding: '8px 0 0' }}>
-                              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, color: future ? 'var(--fg-4)' : n >= 4 ? 'var(--ok)' : n > 0 ? 'var(--warn)' : 'var(--fg-4)', opacity: future ? 0.4 : 1 }}>
+                              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, color: future ? 'var(--fg-2)' : n >= 4 ? 'var(--ok)' : n > 0 ? 'var(--warn)' : 'var(--fg-2)', opacity: future ? 0.4 : 1 }}>
                                 {future ? '–' : `${n}/6`}
                               </span>
                             </td>

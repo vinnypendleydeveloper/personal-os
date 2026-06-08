@@ -68,10 +68,10 @@ export function OperatorCard() {
             </p>
           </div>
           <div className="text-right">
-            <p className="text-2xl font-bold tabular-nums leading-none" style={{ fontFamily: 'var(--font-mono)', color: streak > 0 ? 'var(--accent)' : 'var(--fg-4)' }}>
+            <p className="text-2xl font-bold tabular-nums leading-none" style={{ fontFamily: 'var(--font-mono)', color: streak > 0 ? 'var(--accent)' : 'var(--fg-2)' }}>
               {streak}
             </p>
-            <p className="text-[9px] mt-0.5" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-4)', letterSpacing: '0.1em' }}>
+            <p className="text-[9px] mt-0.5" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)', letterSpacing: '0.1em' }}>
               DAY STREAK
             </p>
           </div>
@@ -119,7 +119,7 @@ function EditableRow({
 
   return (
     <div className="flex items-center justify-between gap-2 group">
-      <span className="text-[10px] font-medium tracking-wider shrink-0" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-4)' }}>
+      <span className="text-[10px] font-medium tracking-wider shrink-0" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)' }}>
         {label}
       </span>
 

@@ -254,7 +254,7 @@ export default function BrainPage() {
               }}
             >
               {asking && !answer && (
-                <div className="flex items-center gap-2" style={{ color: 'var(--fg-4)' }}>
+                <div className="flex items-center gap-2" style={{ color: 'var(--fg-2)' }}>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }}>THINKING</span>
                   <span className="animate-pulse">▋</span>
                 </div>
@@ -269,15 +269,15 @@ export default function BrainPage() {
         {/* ── Conversation History ───────────────────────────────── */}
         <Panel index={2} title="Conversation History" action={
           history.length > 0 ? (
-            <span className="card-label" style={{ color: 'var(--fg-4)' }}>
+            <span className="card-label" style={{ color: 'var(--fg-2)' }}>
               {history.filter(m => m.role === 'user').length} ASKED
             </span>
           ) : undefined
         }>
           {loadingHistory ? (
-            <p className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-4)' }}>Loading memory…</p>
+            <p className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)' }}>Loading memory…</p>
           ) : history.length === 0 ? (
-            <p className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-4)' }}>
+            <p className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)' }}>
               No past conversations yet. Every exchange is remembered and replayed as context next time.
             </p>
           ) : (
@@ -303,7 +303,7 @@ export default function BrainPage() {
                         }}>
                           {m.role === 'user' ? 'YOU' : 'OS'}
                         </span>
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--fg-4)' }}>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--fg-2)' }}>
                           {new Date(m.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                         </span>
                       </div>
@@ -347,7 +347,7 @@ export default function BrainPage() {
 
           {searchResults !== null && (
             searchResults.length === 0 ? (
-              <p className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-4)' }}>No results found.</p>
+              <p className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)' }}>No results found.</p>
             ) : (
               <div className="flex flex-col gap-2">
                 {searchResults.map(r => {
@@ -366,7 +366,7 @@ export default function BrainPage() {
                       <div className="min-w-0">
                         <p className="text-xs leading-relaxed" style={{ color: 'var(--fg)' }}>{r.text}</p>
                         {r.created_at && (
-                          <p className="text-[10px] mt-1" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-4)' }}>
+                          <p className="text-[10px] mt-1" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)' }}>
                             {new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                           </p>
                         )}
