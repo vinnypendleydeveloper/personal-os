@@ -382,8 +382,8 @@ export default function CRMPage() {
     const isActive = quickColId === colId
     return (
       <div
-        className={`${wide ? 'flex' : 'w-40 shrink-0'} flex-col gap-2 group/col`}
-        style={{ ...(wide ? { flex: '1 1 0', minWidth: 160, width: 'auto' } : {}), opacity: isPast ? 0.55 : 1 }}
+        className="flex flex-col gap-2 group/col"
+        style={{ flex: '1 1 0', minWidth: wide ? 160 : 140, opacity: isPast ? 0.55 : 1 }}
       >
         <ColHeader label={label} sub={sub} count={taskList.length} color={color} accent={accent} />
         <div className="flex flex-col gap-1.5 overflow-y-auto flex-1">
@@ -641,12 +641,12 @@ export default function CRMPage() {
           {/* ── Kanban ─────────────────────────────────────────────────────── */}
           {view === 'kanban' && (
             <div className="flex-1 overflow-hidden">
-              <div className="flex h-full overflow-x-auto pb-2" style={{ gap: '0' }}>
+              <div className="flex h-full overflow-x-auto pb-2 gap-3">
 
                 {/* ── Overdue (conditional) ── */}
                 {overdueTasks.length > 0 && (
                   <>
-                    <div className="w-40 shrink-0 flex flex-col gap-2 mr-2.5">
+                    <div className="flex flex-col gap-2" style={{ flex: '1 1 0', minWidth: 140 }}>
                       <ColHeader label="Overdue" sub="Past due" count={overdueTasks.length}
                         color={COL_COLORS.overdue} />
                       <div className="flex flex-col gap-1.5 overflow-y-auto flex-1">
@@ -659,26 +659,24 @@ export default function CRMPage() {
                         ))}
                       </div>
                     </div>
-                    <div className="w-px shrink-0 self-stretch mr-2.5" style={{ background: 'oklch(1 0 0 / 0.06)' }} />
+                    <div className="w-px shrink-0 self-stretch" style={{ background: 'oklch(1 0 0 / 0.06)' }} />
                   </>
                 )}
 
                 {/* ── Today ── */}
-                <div className="mr-2.5 shrink-0">
-                  <KanbanCol
-                    colId="today"
-                    label="Today"
-                    sub={`${MONTH_NAMES[new Date().getMonth()]} ${new Date().getDate()}`}
-                    color={COL_COLORS.today}
-                    taskList={todayTasks}
-                    accent={true}
-                  />
-                </div>
+                <KanbanCol
+                  colId="today"
+                  label="Today"
+                  sub={`${MONTH_NAMES[new Date().getMonth()]} ${new Date().getDate()}`}
+                  color={COL_COLORS.today}
+                  taskList={todayTasks}
+                  accent={true}
+                />
 
-                <div className="w-px shrink-0 self-stretch mr-2.5" style={{ background: 'oklch(1 0 0 / 0.06)' }} />
+                <div className="w-px shrink-0 self-stretch" style={{ background: 'oklch(1 0 0 / 0.06)' }} />
 
                 {/* ── This Week (clickable → expands to overlay) ── */}
-                <div className="w-40 shrink-0 flex flex-col gap-2 mr-2.5 group/week">
+                <div className="flex flex-col gap-2 group/week" style={{ flex: '1 1 0', minWidth: 140 }}>
                   {/* Clickable header */}
                   <button
                     onClick={() => setWeekOpen(true)}
@@ -735,29 +733,25 @@ export default function CRMPage() {
                   </button>
                 </div>
 
-                <div className="w-px shrink-0 self-stretch mr-2.5" style={{ background: 'oklch(1 0 0 / 0.06)' }} />
+                <div className="w-px shrink-0 self-stretch" style={{ background: 'oklch(1 0 0 / 0.06)' }} />
 
                 {/* ── This Month ── */}
-                <div className="mr-2.5 shrink-0">
-                  <KanbanCol
-                    colId="this_month"
-                    label="This Month"
-                    sub="No date"
-                    color={COL_COLORS.this_month}
-                    taskList={thisMonthTasks}
-                  />
-                </div>
+                <KanbanCol
+                  colId="this_month"
+                  label="This Month"
+                  sub="No date"
+                  color={COL_COLORS.this_month}
+                  taskList={thisMonthTasks}
+                />
 
                 {/* ── Someday ── */}
-                <div className="shrink-0">
-                  <KanbanCol
-                    colId="someday"
-                    label="Someday"
-                    sub="No date"
-                    color={COL_COLORS.someday}
-                    taskList={somedayTasks}
-                  />
-                </div>
+                <KanbanCol
+                  colId="someday"
+                  label="Someday"
+                  sub="No date"
+                  color={COL_COLORS.someday}
+                  taskList={somedayTasks}
+                />
 
               </div>
             </div>
