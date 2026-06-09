@@ -4,6 +4,8 @@ import { useEffect, useState, useRef, useCallback, DragEvent, KeyboardEvent } fr
 import { Shell } from '@/components/dashboard/Shell'
 import { Panel } from '@/components/dashboard/Panel'
 
+// ── Types ──────────────────────────────────────────────────────
+
 interface CalEvent {
   id: string
   title: string
@@ -13,6 +15,28 @@ interface CalEvent {
   location?: string
   tag?: string
 }
+
+interface WhoopSnapshot {
+  recovery_score: number | null
+  hrv: number | null
+  rhr: number | null
+  sleep_performance: number | null
+  sleep_hours: number | null
+  strain: number | null
+}
+
+interface DebriefData {
+  wake_time: string | null
+  whoop_connected: boolean
+  whoop: WhoopSnapshot | null
+  yesterday: { sleep_hours: number | null; hrv: number | null; recovery_score: number | null } | null
+  averages: { sleep_7d: number | null; hrv_7d: number | null; recovery_7d: number | null; sample_days: number }
+  comparisons: string[]
+  due_tasks: { id: string; title: string; urgency: string; tags: string[] }[]
+  debrief_message: string | null
+}
+
+// ── Helpers ────────────────────────────────────────────────────
 
 const TAG_COLOR: Record<string, string> = {
   class:    'oklch(0.70 0.16 300)',
@@ -35,6 +59,345 @@ function sameDay(a: Date, b: Date) {
     a.getDate() === b.getDate()
 }
 
+function localDate() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
+function recoveryColor(score: number | null) {
+  if (score == null) return 'var(--fg-3)'
+  if (score >= 66) return 'oklch(0.74 0.17 148)'
+  if (score >= 33) return 'oklch(0.82 0.16 76)'
+  return 'oklch(0.66 0.22 22)'
+}
+
+// ── Recovery Arc ───────────────────────────────────────────────
+
+function RecoveryArc({ score }: { score: number | null }) {
+  const [animated, setAnimated] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setAnimated(true), 80)
+    return () => clearTimeout(t)
+  }, [score])
+
+  const r = 34
+  const size = 84
+  const cx = size / 2
+  const circumference = 2 * Math.PI * r
+  const pct = score ?? 0
+  const filled = animated ? (pct / 100) * circumference : 0
+  const color = recoveryColor(score)
+
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg
+        viewBox={`0 0 ${size} ${size}`}
+        style={{ transform: 'rotate(-90deg)', width: size, height: size }}
+      >
+        {/* Track */}
+        <circle
+          cx={cx} cy={cx} r={r}
+          fill="none"
+          stroke="var(--bg-3)"
+          strokeWidth={7}
+        />
+        {/* Fill */}
+        <circle
+          cx={cx} cy={cx} r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth={7}
+          strokeLinecap="round"
+          strokeDasharray={`${filled} ${circumference}`}
+          style={{
+            transition: 'stroke-dasharray 1.1s cubic-bezier(0.22, 1, 0.36, 1)',
+            filter: score != null ? `drop-shadow(0 0 5px ${color})` : 'none',
+          }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: score != null ? 22 : 18,
+          fontWeight: 700,
+          color,
+          lineHeight: 1,
+          letterSpacing: '-0.02em',
+        }}>
+          {score != null ? score : '—'}
+        </span>
+        <span style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 7,
+          color: 'var(--fg-3)',
+          letterSpacing: '0.14em',
+          marginTop: 2,
+        }}>
+          RECOV
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// ── Stat cell ──────────────────────────────────────────────────
+
+function Stat({ label, value, unit, dim }: {
+  label: string
+  value: number | string | null
+  unit?: string
+  dim?: boolean
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span style={{
+        fontFamily: 'var(--font-mono)',
+        fontSize: 8,
+        letterSpacing: '0.13em',
+        color: 'var(--fg-3)',
+        textTransform: 'uppercase',
+      }}>
+        {label}
+      </span>
+      <div className="flex items-baseline gap-1">
+        <span style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 17,
+          fontWeight: 600,
+          color: dim ? 'var(--fg-3)' : 'var(--fg)',
+          lineHeight: 1,
+          letterSpacing: '-0.02em',
+        }}>
+          {value ?? '—'}
+        </span>
+        {unit && value != null && (
+          <span style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 9,
+            color: 'var(--fg-3)',
+            letterSpacing: '0.06em',
+          }}>
+            {unit}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Comparison chips ──────────────────────────────────────────
+
+function ComparisonChip({ text }: { text: string }) {
+  const isUp = text.includes('more') || text.includes('above') || text.includes('Best') || text.includes('best')
+  const color = isUp ? 'oklch(0.74 0.17 148)' : 'oklch(0.82 0.16 76)'
+  const symbol = isUp ? '↑' : '↓'
+  return (
+    <span style={{
+      fontFamily: 'var(--font-mono)',
+      fontSize: 9,
+      fontWeight: 500,
+      letterSpacing: '0.04em',
+      padding: '2px 6px',
+      borderRadius: 4,
+      color,
+      background: `color-mix(in oklch, ${color} 12%, transparent)`,
+      border: `1px solid color-mix(in oklch, ${color} 28%, transparent)`,
+      whiteSpace: 'nowrap',
+    }}>
+      {symbol} {text}
+    </span>
+  )
+}
+
+// ── Morning Debrief panel ──────────────────────────────────────
+
+function MorningDebrief() {
+  const [data, setData] = useState<DebriefData | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/debrief')
+      .then(r => r.json())
+      .then((d: DebriefData) => { setData(d); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [])
+
+  const wakeStr = data?.wake_time
+    ? new Date(data.wake_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    : null
+
+  const today = new Date()
+  const dateStr = today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+
+  const recColor = recoveryColor(data?.whoop?.recovery_score ?? null)
+
+  return (
+    <Panel
+      index={0}
+      title="Morning Debrief"
+      action={
+        wakeStr ? (
+          <span style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10,
+            letterSpacing: '0.1em',
+            color: 'oklch(0.82 0.16 76)',
+          }}>
+            AWAKE · {wakeStr}
+          </span>
+        ) : loading ? (
+          <span className="font-mono text-[10px]" style={{ color: 'var(--fg-3)' }}>LOGGING…</span>
+        ) : null
+      }
+      style={{
+        background: `color-mix(in oklch, var(--bg-1) 96%, oklch(0.82 0.16 76) 4%)`,
+      }}
+    >
+      {/* Date line */}
+      <p style={{
+        fontFamily: 'var(--font-mono)',
+        fontSize: 9,
+        color: 'var(--fg-3)',
+        letterSpacing: '0.12em',
+        marginTop: -4,
+        textTransform: 'uppercase',
+      }}>
+        {dateStr}
+      </p>
+
+      {loading ? (
+        <div className="flex flex-col gap-3">
+          {/* Skeleton */}
+          <div className="flex items-center gap-4">
+            <div className="shrink-0 rounded-full" style={{ width: 84, height: 84, background: 'var(--bg-3)' }} />
+            <div className="flex flex-col gap-2 flex-1">
+              {[50, 70, 40, 60].map(w => (
+                <div key={w} className="rounded" style={{ height: 10, width: `${w}%`, background: 'var(--bg-3)' }} />
+              ))}
+            </div>
+          </div>
+          <div className="rounded" style={{ height: 36, background: 'var(--bg-3)' }} />
+        </div>
+      ) : (
+        <>
+          {/* Biometrics row */}
+          {(data?.whoop || data?.whoop_connected === false) && (
+            <div className="flex items-center gap-4">
+              {data.whoop ? (
+                <>
+                  <RecoveryArc score={data.whoop.recovery_score} />
+                  <div className="grid grid-cols-2 gap-x-5 gap-y-3 flex-1">
+                    <Stat label="Sleep" value={data.whoop.sleep_hours} unit="h" />
+                    <Stat label="HRV" value={data.whoop.hrv} unit="ms" />
+                    <Stat
+                      label="Sleep Score"
+                      value={data.whoop.sleep_performance != null ? `${data.whoop.sleep_performance}%` : null}
+                    />
+                    <Stat label="RHR" value={data.whoop.rhr} unit="bpm" dim />
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-2.5 py-1">
+                  <span style={{ fontSize: 16 }}>⌚</span>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-3)', letterSpacing: '0.08em' }}>
+                    WHOOP not connected — no sleep data
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Comparison chips */}
+          {data?.comparisons && data.comparisons.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {data.comparisons.map((c, i) => <ComparisonChip key={i} text={c} />)}
+            </div>
+          )}
+
+          {/* AI Briefing */}
+          {data?.debrief_message && (
+            <div
+              className="pl-3 py-0.5"
+              style={{
+                borderLeft: `2px solid ${data.whoop?.recovery_score != null ? recColor : 'var(--accent)'}`,
+              }}
+            >
+              <p style={{
+                fontFamily: 'var(--font-sans)',
+                fontSize: 12.5,
+                color: 'var(--fg)',
+                lineHeight: 1.55,
+                opacity: 0.9,
+              }}>
+                {data.debrief_message}
+              </p>
+            </div>
+          )}
+
+          {/* Due Today */}
+          {data?.due_tasks && data.due_tasks.length > 0 && (
+            <div className="pt-1" style={{ borderTop: '1px solid var(--border)' }}>
+              <p style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 8,
+                letterSpacing: '0.14em',
+                color: 'var(--fg-3)',
+                marginBottom: 6,
+              }}>
+                DUE TODAY
+              </p>
+              <div className="flex flex-col gap-1.5">
+                {data.due_tasks.map(task => (
+                  <div key={task.id} className="flex items-center gap-2">
+                    <div
+                      className="w-1 h-1 rounded-full shrink-0"
+                      style={{ background: task.urgency === 'today' ? 'var(--hot)' : 'var(--warn)' }}
+                    />
+                    <span style={{
+                      fontFamily: 'var(--font-sans)',
+                      fontSize: 12,
+                      color: 'var(--fg)',
+                      flex: 1,
+                      minWidth: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {task.title}
+                    </span>
+                    {task.tags?.slice(0, 1).map(tag => (
+                      <span key={tag} style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 8,
+                        letterSpacing: '0.08em',
+                        color: 'var(--fg-3)',
+                        padding: '1px 5px',
+                        background: 'var(--bg-3)',
+                        borderRadius: 3,
+                      }}>
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Empty state: no WHOOP, no tasks, no message */}
+          {!data?.whoop && !data?.debrief_message && !data?.due_tasks?.length && (
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-3)', letterSpacing: '0.08em' }}>
+              Wake time logged. Connect WHOOP for full debrief.
+            </p>
+          )}
+        </>
+      )}
+    </Panel>
+  )
+}
+
+// ── Today's Schedule ───────────────────────────────────────────
+
 function TodaySchedule() {
   const [events, setEvents] = useState<CalEvent[]>([])
   const [loading, setLoading] = useState(true)
@@ -56,7 +419,7 @@ function TodaySchedule() {
   const past = events.filter(e => !e.allDay && new Date(e.end) < now)
 
   return (
-    <Panel index={1} title="Today's Schedule" action={
+    <Panel index={2} title="Today's Schedule" action={
       <span className="font-mono text-[10px]" style={{ color: 'var(--fg-2)' }}>
         {events.length} event{events.length !== 1 ? 's' : ''}
       </span>
@@ -84,7 +447,7 @@ function TodaySchedule() {
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <p className="text-xs font-medium" style={{ color: isNow ? 'var(--fg)' : 'var(--fg)' }}>
+                    <p className="text-xs font-medium" style={{ color: 'var(--fg)' }}>
                       {event.title}
                     </p>
                     {isNow && (
@@ -140,10 +503,7 @@ function TodaySchedule() {
   )
 }
 
-function localDate() {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-}
+// ── Weight Input ───────────────────────────────────────────────
 
 function WeightInput({ onSaved }: { onSaved: (logged: boolean) => void }) {
   const today = localDate()
@@ -152,7 +512,6 @@ function WeightInput({ onSaved }: { onSaved: (logged: boolean) => void }) {
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // Stable ref so useEffect doesn't re-run when parent re-renders
   const onSavedRef = useRef(onSaved)
   useEffect(() => { onSavedRef.current = onSaved }, [onSaved])
 
@@ -199,7 +558,7 @@ function WeightInput({ onSaved }: { onSaved: (logged: boolean) => void }) {
   const isEditing = dirty || saved == null
 
   return (
-    <Panel index={0} title="Weight" action={
+    <Panel index={1} title="Weight" action={
       saved != null && !dirty
         ? <span className="font-mono text-[10px]" style={{ color: 'var(--ok)' }}>LOGGED ●</span>
         : <span className="font-mono text-[10px]" style={{ color: 'var(--hot)' }}>REQUIRED</span>
@@ -244,9 +603,7 @@ function WeightInput({ onSaved }: { onSaved: (logged: boolean) => void }) {
         )}
       </div>
       {error && (
-        <p className="font-mono text-[10px]" style={{ color: 'var(--hot)' }}>
-          {error}
-        </p>
+        <p className="font-mono text-[10px]" style={{ color: 'var(--hot)' }}>{error}</p>
       )}
       {!error && saved != null && !dirty && (
         <p className="font-mono text-[10px]" style={{ color: 'var(--fg-2)' }}>
@@ -261,6 +618,8 @@ function WeightInput({ onSaved }: { onSaved: (logged: boolean) => void }) {
     </Panel>
   )
 }
+
+// ── Main page ──────────────────────────────────────────────────
 
 interface Item { id: string; label: string }
 
@@ -303,7 +662,6 @@ export default function MorningRoutinePage() {
 
   async function toggle(id: string) {
     const isDone = !!completions[id]
-    // optimistic
     const next = { ...completions }
     if (isDone) delete next[id]
     else next[id] = new Date().toISOString()
@@ -337,7 +695,6 @@ export default function MorningRoutinePage() {
     if (v) saveItems(items.map(i => i.id === id ? { ...i, label: v } : i))
   }
 
-  // ── Drag and drop reorder ──
   function onDrop(targetId: string) {
     if (!dragId || dragId === targetId) { setDragId(null); setOverId(null); return }
     const from = items.findIndex(i => i.id === dragId)
@@ -351,7 +708,6 @@ export default function MorningRoutinePage() {
 
   const completedItems = items.filter(i => completions[i.id]).length
   const totalItems = items.length
-  // Weight is a required step — counts as 1 of N+1 in the progress bar
   const progressCompleted = completedItems + (weightLogged ? 1 : 0)
   const progressTotal = totalItems + 1
   const pct = progressTotal ? Math.round((progressCompleted / progressTotal) * 100) : 0
@@ -360,6 +716,9 @@ export default function MorningRoutinePage() {
   return (
     <Shell>
       <div className="flex flex-col gap-4" style={{ maxWidth: 640, margin: '0 auto' }}>
+
+        {/* Morning Debrief — always first, logs wake time on mount */}
+        <MorningDebrief />
 
         <WeightInput onSaved={handleWeightSaved} />
 
@@ -381,7 +740,7 @@ export default function MorningRoutinePage() {
           </div>
         </div>
 
-        <Panel index={2} title="Today" status={allDone ? 'online' : 'none'} action={
+        <Panel index={3} title="Today" status={allDone ? 'online' : 'none'} action={
           <span className="card-label" style={{ color: allDone ? 'var(--ok)' : 'var(--fg-3)' }}>
             {progressCompleted}/{progressTotal}{allDone ? ' COMPLETE ●' : ''}
           </span>
@@ -420,17 +779,12 @@ export default function MorningRoutinePage() {
                       cursor: editingId === item.id ? 'text' : 'grab',
                     }}
                   >
-                    {/* Drag handle */}
                     <span className="shrink-0 select-none opacity-30 group-hover:opacity-60 transition-opacity" style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--fg-3)', cursor: 'grab' }}>
                       ⠿
                     </span>
-
-                    {/* Index */}
                     <span className="shrink-0 w-4 text-right tabular-nums" style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-2)' }}>
                       {idx + 1}
                     </span>
-
-                    {/* Checkbox */}
                     <button
                       onClick={() => toggle(item.id)}
                       className="w-5 h-5 rounded shrink-0 border flex items-center justify-center transition-all duration-200"
@@ -444,8 +798,6 @@ export default function MorningRoutinePage() {
                         <svg width="10" height="8" viewBox="0 0 8 6" fill="none"><path d="M1 3L3 5L7 1" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                       )}
                     </button>
-
-                    {/* Label (click to rename) */}
                     {editingId === item.id ? (
                       <input
                         ref={editRef}
@@ -474,15 +826,11 @@ export default function MorningRoutinePage() {
                         {item.label}
                       </span>
                     )}
-
-                    {/* Completion timestamp */}
                     {done && (
                       <span className="shrink-0 tabular-nums" style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ok)' }}>
                         {new Date(done).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                       </span>
                     )}
-
-                    {/* Delete */}
                     <button
                       onClick={() => deleteItem(item.id)}
                       className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
