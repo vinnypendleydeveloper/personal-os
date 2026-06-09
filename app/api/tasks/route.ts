@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient, USER_ID } from '@/lib/supabase'
 import { embedMemory } from '@/lib/embed'
+import { createTaskEvent } from '@/lib/gcal'
 
 export async function GET(req: NextRequest) {
   const db = getServiceClient()
@@ -44,6 +45,27 @@ export async function POST(req: NextRequest) {
   }).select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Create Google Calendar event if task has a due date
+  if (data.due_date) {
+    try {
+      const eventId = await createTaskEvent({
+        id: data.id,
+        title: data.title,
+        description: data.description,
+        due_date: data.due_date,
+        urgency: data.urgency,
+        tags: data.tags as string[],
+      })
+      if (eventId) {
+        await db.from('tasks').update({ gcal_event_id: eventId }).eq('id', data.id)
+        data.gcal_event_id = eventId
+      }
+    } catch (err) {
+      console.error('gcal create event failed:', err)
+      // Non-fatal — task was created successfully
+    }
+  }
 
   // Embed into long-term memory so the brain can recall it later
   await embedMemory({
