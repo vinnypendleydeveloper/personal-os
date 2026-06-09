@@ -4,6 +4,142 @@ import { useEffect, useState, useRef, useCallback, DragEvent, KeyboardEvent } fr
 import { Shell } from '@/components/dashboard/Shell'
 import { Panel } from '@/components/dashboard/Panel'
 
+interface CalEvent {
+  id: string
+  title: string
+  start: string
+  end: string
+  allDay: boolean
+  location?: string
+  tag?: string
+}
+
+const TAG_COLOR: Record<string, string> = {
+  class:    'oklch(0.70 0.16 300)',
+  gym:      'oklch(0.72 0.18 30)',
+  tennis:   'oklch(0.74 0.17 148)',
+  call:     'oklch(0.74 0.15 200)',
+  meeting:  'oklch(0.70 0.16 250)',
+  work:     'oklch(0.74 0.16 70)',
+  social:   'oklch(0.74 0.17 350)',
+  personal: 'var(--fg-3)',
+}
+
+function fmtTime(date: Date) {
+  return date.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit' })
+}
+
+function sameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+}
+
+function TodaySchedule() {
+  const [events, setEvents] = useState<CalEvent[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/calendar')
+      .then(r => r.json())
+      .then(data => {
+        const today = new Date()
+        const todayEvents = (data.events ?? []).filter((e: CalEvent) => sameDay(new Date(e.start), today))
+        setEvents(todayEvents)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [])
+
+  const now = new Date()
+  const upcoming = events.filter(e => e.allDay || new Date(e.end) >= now)
+  const past = events.filter(e => !e.allDay && new Date(e.end) < now)
+
+  return (
+    <Panel index={1} title="Today's Schedule" action={
+      <span className="font-mono text-[10px]" style={{ color: 'var(--fg-2)' }}>
+        {events.length} event{events.length !== 1 ? 's' : ''}
+      </span>
+    }>
+      {loading ? (
+        <p className="text-xs font-mono" style={{ color: 'var(--fg-2)' }}>LOADING…</p>
+      ) : events.length === 0 ? (
+        <p className="text-xs font-mono" style={{ color: 'var(--fg-3)' }}>No events scheduled today.</p>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          {upcoming.map(event => {
+            const tagColor = TAG_COLOR[event.tag ?? 'personal'] ?? 'var(--fg-3)'
+            const startDate = new Date(event.start)
+            const endDate = new Date(event.end)
+            const isNow = !event.allDay && startDate <= now && endDate > now
+            return (
+              <div key={event.id} className="flex gap-2.5 items-start">
+                <div
+                  className="w-1 rounded-full mt-1.5 shrink-0 self-stretch"
+                  style={{
+                    background: tagColor,
+                    minHeight: 8,
+                    boxShadow: isNow ? `0 0 6px color-mix(in oklch, ${tagColor} 70%, transparent)` : 'none',
+                  }}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="text-xs font-medium" style={{ color: isNow ? 'var(--fg)' : 'var(--fg)' }}>
+                      {event.title}
+                    </p>
+                    {isNow && (
+                      <span className="font-mono text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: 'var(--hot)', color: 'var(--bg)', letterSpacing: '0.06em' }}>
+                        NOW
+                      </span>
+                    )}
+                    {event.tag && (
+                      <span style={{
+                        fontFamily: 'var(--font-mono)', fontSize: 8, fontWeight: 600, letterSpacing: '0.06em',
+                        padding: '1px 4px', borderRadius: 3, color: tagColor,
+                        background: `color-mix(in oklch, ${tagColor} 13%, transparent)`,
+                        border: `1px solid color-mix(in oklch, ${tagColor} 32%, transparent)`,
+                      }}>
+                        {event.tag.toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] font-mono" style={{ color: 'var(--fg-2)' }}>
+                    {event.allDay ? 'All day' : `${fmtTime(startDate)} – ${fmtTime(endDate)}`}
+                  </p>
+                  {event.location && (
+                    <p className="text-[10px]" style={{ color: 'var(--fg-3)' }}>📍 {event.location}</p>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+          {past.length > 0 && (
+            <div className="mt-1 pt-1.5" style={{ borderTop: '1px solid var(--border)' }}>
+              <p className="font-mono text-[9px] mb-1.5" style={{ color: 'var(--fg-3)', letterSpacing: '0.1em' }}>COMPLETED</p>
+              {past.map(event => {
+                const tagColor = TAG_COLOR[event.tag ?? 'personal'] ?? 'var(--fg-3)'
+                return (
+                  <div key={event.id} className="flex gap-2.5 items-start opacity-45">
+                    <div className="w-1 rounded-full mt-1.5 shrink-0 self-stretch" style={{ background: tagColor, minHeight: 8 }} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium" style={{ color: 'var(--fg-2)', textDecoration: 'line-through' }}>
+                        {event.title}
+                      </p>
+                      <p className="text-[10px] font-mono" style={{ color: 'var(--fg-3)' }}>
+                        {fmtTime(new Date(event.start))} – {fmtTime(new Date(event.end))}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </Panel>
+  )
+}
+
 function localDate() {
   const now = new Date()
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
@@ -227,6 +363,8 @@ export default function MorningRoutinePage() {
 
         <WeightInput onSaved={handleWeightSaved} />
 
+        <TodaySchedule />
+
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <h1 style={{ fontFamily: 'var(--font-mono)', fontSize: 15, fontWeight: 700, letterSpacing: '0.16em', color: 'var(--fg)' }}>
@@ -243,7 +381,7 @@ export default function MorningRoutinePage() {
           </div>
         </div>
 
-        <Panel index={1} title="Today" status={allDone ? 'online' : 'none'} action={
+        <Panel index={2} title="Today" status={allDone ? 'online' : 'none'} action={
           <span className="card-label" style={{ color: allDone ? 'var(--ok)' : 'var(--fg-3)' }}>
             {progressCompleted}/{progressTotal}{allDone ? ' COMPLETE ●' : ''}
           </span>
