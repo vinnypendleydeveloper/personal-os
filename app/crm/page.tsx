@@ -60,44 +60,31 @@ function fmtDate(s: string) {
   return `${MONTH_NAMES[m - 1]} ${d}`
 }
 
-// ─── Column definitions ───────────────────────────────────────────────────────
-// Each column has a kind, a display config, and a "tint" color for theming
-type ColKind = 'overdue' | 'today' | 'day' | 'this_month' | 'someday' | 'backlog'
-
-interface ColDef {
-  id: string
-  kind: ColKind
-  label: string
-  sub: string
-  color: string    // accent color
-  dateStr?: string // day columns only
-  group: 'anchor' | 'week' | 'horizon' | 'backlog'
-}
-
-// Column colors — warm left, cool right
-const COL_COLORS: Record<ColKind, string> = {
+// ─── Column colors ────────────────────────────────────────────────────────────
+const COL_COLORS = {
   overdue:    'oklch(0.62 0.22 18)',
   today:      'oklch(0.72 0.18 240)',
   day:        'oklch(0.60 0.08 240)',
+  this_week:  'oklch(0.65 0.13 200)',
   this_month: 'oklch(0.68 0.14 55)',
   someday:    'oklch(0.58 0.07 240)',
-  backlog:    'oklch(0.42 0.03 240)',
 }
 
 // ─── Bucketing ────────────────────────────────────────────────────────────────
 function getBucket(task: Task, today: string, weekDates: Set<string>): string {
   const due = task.due_date
   if (due) {
-    if (due < today)              return 'overdue'
-    if (due === today)            return 'today'
-    if (weekDates.has(due))       return `day:${due}`
-    return 'backlog'              // future date outside this week
+    if (due < today)        return 'overdue'
+    if (due === today)      return 'today'
+    if (weekDates.has(due)) return `day:${due}`
+    // Future date outside this week — bucket by month
+    if (due.slice(0, 7) === today.slice(0, 7)) return 'this_month'
+    return 'someday'
   }
-  // no due_date — use urgency
   if (task.urgency === 'today')      return 'today'
   if (task.urgency === 'this_month') return 'this_month'
   if (task.urgency === 'someday')    return 'someday'
-  return 'backlog'
+  return 'someday'
 }
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
@@ -185,28 +172,6 @@ function ColHeader({ label, sub, count, color, accent = false }: {
   )
 }
 
-// ─── Group label ──────────────────────────────────────────────────────────────
-function GroupLabel({ label }: { label: string }) {
-  return (
-    <div className="flex items-center gap-2 self-start pt-1 shrink-0" style={{ width: 16 }}>
-      <div style={{
-        writingMode: 'vertical-lr',
-        transform: 'rotate(180deg)',
-        fontFamily: 'var(--font-mono)',
-        fontSize: 8,
-        fontWeight: 700,
-        letterSpacing: '0.16em',
-        textTransform: 'uppercase',
-        color: 'var(--ink-4)',
-        opacity: 0.5,
-        userSelect: 'none',
-        lineHeight: 1,
-        paddingTop: 4,
-      }}>{label}</div>
-    </div>
-  )
-}
-
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function CRMPage() {
   const [tasks,   setTasks]   = useState<Task[]>([])
@@ -214,16 +179,17 @@ export default function CRMPage() {
   const [view, setView] = useState<View>(() =>
     typeof window !== 'undefined' ? (localStorage.getItem('pos-crm-view') as View) ?? 'kanban' : 'kanban'
   )
+  const [weekOpen, setWeekOpen] = useState(false)
 
-  const weekDays  = getWeekDays()
-  const today     = todayStr()
+  const weekDays    = getWeekDays()
+  const today       = todayStr()
   const weekDateSet = new Set(weekDays.map(d => d.str))
 
   // Header add-task form
   const [newTitle,    setNewTitle]    = useState('')
   const [newPriority, setNewPriority] = useState<Priority>('medium')
   const [newDate,     setNewDate]     = useState(today)
-  const [newUrgency,  setNewUrgency]  = useState('')  // '' = use date; 'today'|'this_month'|'someday'
+  const [newUrgency,  setNewUrgency]  = useState('')
   const [newKey,      setNewKey]      = useState(false)
   const [adding,      setAdding]      = useState(false)
 
@@ -252,6 +218,14 @@ export default function CRMPage() {
   useEffect(() => { fetchTasks() }, [])
   useEffect(() => { if (quickColId) setTimeout(() => quickRef.current?.focus(), 40) }, [quickColId])
 
+  // Close week overlay on Escape
+  useEffect(() => {
+    if (!weekOpen) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setWeekOpen(false) }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [weekOpen])
+
   async function fetchTasks() {
     const res = await fetch('/api/tasks?status=open')
     const { tasks: data } = await res.json()
@@ -261,7 +235,6 @@ export default function CRMPage() {
 
   function setViewPersist(v: View) { setView(v); localStorage.setItem('pos-crm-view', v) }
 
-  // addTask — accepts explicit urgency/date or falls back to form state
   async function addTask(opts?: { colId?: string; title?: string; urgency?: string; date?: string }) {
     const title = (opts?.title ?? newTitle).trim()
     if (!title) return
@@ -271,16 +244,11 @@ export default function CRMPage() {
     let urgency  = opts?.urgency ?? (newUrgency || 'someday')
     let due_date = opts?.date ?? (newUrgency ? null : newDate || null)
 
-    // Derive urgency from date if date-based add
     if (due_date && !opts?.urgency) {
       if (due_date === today) urgency = 'today'
       else if (weekDateSet.has(due_date)) urgency = 'this_week'
       else urgency = 'someday'
     }
-
-    const priority = scoreToPriority(PRIORITY_CFG[opts ? 'medium' : newPriority].score) === 'none'
-      ? newPriority
-      : newPriority
 
     const res = await fetch('/api/tasks', {
       method: 'POST',
@@ -289,7 +257,7 @@ export default function CRMPage() {
         title,
         urgency,
         key: opts?.colId ? false : newKey,
-        priority_score: PRIORITY_CFG[opts?.colId ? 'medium' : priority].score,
+        priority_score: PRIORITY_CFG[opts?.colId ? 'medium' : newPriority].score,
         due_date: due_date || null,
       }),
     })
@@ -366,15 +334,25 @@ export default function CRMPage() {
   // ── Bucketed task lists ────────────────────────────────────────────────────
   const sorted = (arr: Task[]) => [...arr].sort((a, b) => b.priority_score - a.priority_score)
 
-  const overdueTasks    = sorted(tasks.filter(t => getBucket(t, today, weekDateSet) === 'overdue'))
-  const todayTasks      = sorted(tasks.filter(t => getBucket(t, today, weekDateSet) === 'today'))
-  const thisMonthTasks  = sorted(tasks.filter(t => getBucket(t, today, weekDateSet) === 'this_month'))
-  const somedayTasks    = sorted(tasks.filter(t => getBucket(t, today, weekDateSet) === 'someday'))
-  const backlogTasks    = sorted(tasks.filter(t => getBucket(t, today, weekDateSet) === 'backlog'))
+  const overdueTasks   = sorted(tasks.filter(t => getBucket(t, today, weekDateSet) === 'overdue'))
+  const todayTasks     = sorted(tasks.filter(t => getBucket(t, today, weekDateSet) === 'today'))
+  const thisMonthTasks = sorted(tasks.filter(t => getBucket(t, today, weekDateSet) === 'this_month'))
+  const somedayTasks   = sorted(tasks.filter(t => getBucket(t, today, weekDateSet) === 'someday'))
 
   function dayTasks(dateStr: string) {
     return sorted(tasks.filter(t => getBucket(t, today, weekDateSet) === `day:${dateStr}`))
   }
+
+  // For the overlay: today's column uses the 'today' bucket
+  function overlayDayTasks(dateStr: string) {
+    return dateStr === today ? todayTasks : dayTasks(dateStr)
+  }
+
+  // This Week column on main board: all week days except today
+  const thisWeekNonTodayTasks = sorted(
+    weekDays.filter(d => d.str !== today).flatMap(d => dayTasks(d.str))
+  )
+  const thisWeekTotal = thisWeekNonTodayTasks.length + todayTasks.length
 
   const smartResults = (smartIds ?? []).map(id => tasks.find(t => t.id === id)).filter(Boolean) as Task[]
 
@@ -397,13 +375,16 @@ export default function CRMPage() {
   }
 
   // ── Column component ───────────────────────────────────────────────────────
-  function KanbanCol({ colId, label, sub, color, taskList, showDate = false, accent = false, isPast = false }: {
+  function KanbanCol({ colId, label, sub, color, taskList, showDate = false, accent = false, isPast = false, wide = false }: {
     colId: string; label: string; sub: string; color: string; taskList: Task[];
-    showDate?: boolean; accent?: boolean; isPast?: boolean
+    showDate?: boolean; accent?: boolean; isPast?: boolean; wide?: boolean
   }) {
     const isActive = quickColId === colId
     return (
-      <div className="w-40 shrink-0 flex flex-col gap-2 group/col" style={{ opacity: isPast ? 0.55 : 1 }}>
+      <div
+        className={`${wide ? 'flex' : 'w-40 shrink-0'} flex-col gap-2 group/col`}
+        style={{ ...(wide ? { flex: '1 1 0', minWidth: 160, width: 'auto' } : {}), opacity: isPast ? 0.55 : 1 }}
+      >
         <ColHeader label={label} sub={sub} count={taskList.length} color={color} accent={accent} />
         <div className="flex flex-col gap-1.5 overflow-y-auto flex-1">
           {loading && accent ? (
@@ -449,6 +430,120 @@ export default function CRMPage() {
     )
   }
 
+  // ── Week Overlay ───────────────────────────────────────────────────────────
+  function WeekOverlay() {
+    const weekStart = weekDays[0]
+    const weekEnd   = weekDays[6]
+    const range     = `${weekStart.sub} – ${weekEnd.sub}`
+
+    return (
+      <>
+        <style>{`
+          @keyframes weekSlideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to   { opacity: 1; transform: translateY(0);    }
+          }
+          .week-overlay { animation: weekSlideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) both; }
+        `}</style>
+
+        {/* Backdrop */}
+        <div
+          className="fixed inset-0 z-40"
+          style={{ background: 'oklch(0.04 0.01 240 / 0.72)', backdropFilter: 'blur(8px)' }}
+          onClick={() => setWeekOpen(false)}
+        />
+
+        {/* Sheet */}
+        <div
+          className="fixed inset-x-0 bottom-0 z-50 week-overlay flex flex-col"
+          style={{
+            top: '52px',
+            background: 'var(--background)',
+            borderTop: '1px solid oklch(1 0 0 / 0.1)',
+            borderRadius: '16px 16px 0 0',
+            boxShadow: '0 -24px 80px oklch(0 0 0 / 0.5)',
+          }}
+        >
+          {/* Drag handle */}
+          <div className="flex justify-center pt-3 pb-1 shrink-0">
+            <div className="w-8 h-1 rounded-full" style={{ background: 'oklch(1 0 0 / 0.15)' }} />
+          </div>
+
+          {/* Header */}
+          <div
+            className="flex items-center gap-4 px-6 py-3 shrink-0"
+            style={{ borderBottom: '1px solid oklch(1 0 0 / 0.07)' }}
+          >
+            <div className="w-2 h-2 rounded-full shrink-0" style={{ background: COL_COLORS.this_week }} />
+            <div>
+              <div
+                className="text-[11px] font-mono font-bold uppercase tracking-widest"
+                style={{ color: COL_COLORS.this_week }}
+              >
+                This Week
+              </div>
+              <div className="text-[10px] font-mono mt-0.5" style={{ color: 'var(--ink-4)' }}>{range}</div>
+            </div>
+
+            <div className="flex-1" />
+
+            <div className="font-mono text-[10px] tabular-nums" style={{ color: 'var(--ink-4)' }}>
+              {thisWeekTotal} task{thisWeekTotal !== 1 ? 's' : ''} this week
+            </div>
+
+            <button
+              onClick={() => setWeekOpen(false)}
+              className="flex items-center gap-1.5 text-[11px] font-mono px-3 py-1.5 rounded-lg transition-opacity hover:opacity-70"
+              style={{ background: 'var(--ink-2)', color: 'var(--ink-4)', border: '1px solid oklch(1 0 0 / 0.08)' }}
+            >
+              ✕ Close
+            </button>
+          </div>
+
+          {/* Day columns */}
+          <div className="flex-1 flex gap-3 px-5 py-4 overflow-x-auto overflow-y-hidden">
+            {weekDays.map(day => {
+              const isToday  = day.str === today
+              const isPast   = day.str < today
+              const colColor = isToday ? COL_COLORS.today : COL_COLORS.day
+
+              return (
+                <div
+                  key={day.str}
+                  className="flex flex-col gap-0"
+                  style={{
+                    flex: '1 1 0',
+                    minWidth: 168,
+                    borderRadius: 10,
+                    padding: isToday ? '10px' : '0 4px',
+                    background: isToday
+                      ? `color-mix(in oklch, ${COL_COLORS.today} 6%, transparent)`
+                      : 'transparent',
+                    border: isToday
+                      ? `1px solid color-mix(in oklch, ${COL_COLORS.today} 20%, transparent)`
+                      : '1px solid transparent',
+                    opacity: isPast ? 0.5 : 1,
+                  }}
+                >
+                  <KanbanCol
+                    colId={`day:${day.str}`}
+                    label={isToday ? `${day.label} · Today` : day.label}
+                    sub={day.sub}
+                    color={colColor}
+                    taskList={overlayDayTasks(day.str)}
+                    accent={isToday}
+                    isPast={false}
+                    wide={true}
+                  />
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </>
+    )
+  }
+
   // ── Header slot options ────────────────────────────────────────────────────
   const slotOptions = [
     { value: 'today',      label: 'Today' },
@@ -460,6 +555,9 @@ export default function CRMPage() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <Shell>
+      {/* Week overlay — rendered at Shell root so it covers full content area */}
+      {weekOpen && <WeekOverlay />}
+
       <div className="flex gap-4 h-[calc(100vh-64px)]">
 
         {/* Main area */}
@@ -493,7 +591,6 @@ export default function CRMPage() {
                   style={{ background: 'var(--ink-2)', border: '1px solid oklch(1 0 0 / 0.08)', color: 'var(--foreground)' }}
                 />
 
-                {/* Slot selector */}
                 <select
                   value={newUrgency}
                   onChange={e => setNewUrgency(e.target.value)}
@@ -503,7 +600,6 @@ export default function CRMPage() {
                   {slotOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
 
-                {/* Date picker — shown when slot = "pick date" */}
                 {newUrgency === '' && (
                   <input
                     type="date"
@@ -514,7 +610,6 @@ export default function CRMPage() {
                   />
                 )}
 
-                {/* Priority */}
                 <div className="flex gap-1">
                   {PRIORITY_ORDER.filter(p => p !== 'none').map(p => (
                     <button key={p} onClick={() => setNewPriority(p)}
@@ -564,7 +659,6 @@ export default function CRMPage() {
                         ))}
                       </div>
                     </div>
-                    {/* Group separator */}
                     <div className="w-px shrink-0 self-stretch mr-2.5" style={{ background: 'oklch(1 0 0 / 0.06)' }} />
                   </>
                 )}
@@ -581,37 +675,67 @@ export default function CRMPage() {
                   />
                 </div>
 
-                {/* Group separator */}
                 <div className="w-px shrink-0 self-stretch mr-2.5" style={{ background: 'oklch(1 0 0 / 0.06)' }} />
 
-                {/* ── Week zone label + day columns ── */}
-                <div className="flex items-start gap-0 shrink-0">
-                  <GroupLabel label="This week" />
-                  <div
-                    className="flex gap-2.5 rounded-lg p-2 pt-0 shrink-0"
-                    style={{ background: 'oklch(1 0 0 / 0.015)', border: '1px solid oklch(1 0 0 / 0.04)' }}
+                {/* ── This Week (clickable → expands to overlay) ── */}
+                <div className="w-40 shrink-0 flex flex-col gap-2 mr-2.5 group/week">
+                  {/* Clickable header */}
+                  <button
+                    onClick={() => setWeekOpen(true)}
+                    className="w-full text-left px-1 pb-1.5 flex items-start gap-2 shrink-0 transition-opacity hover:opacity-100"
+                    style={{
+                      borderBottom: `1px solid color-mix(in oklch, ${COL_COLORS.this_week} 40%, transparent)`,
+                      opacity: 0.85,
+                    }}
                   >
-                    {weekDays.map(day => {
-                      const isToday = day.str === today
-                      const isPast  = day.str < today
-                      if (isToday) return null // today already has its own column
-                      return (
-                        <KanbanCol
-                          key={day.str}
-                          colId={`day:${day.str}`}
-                          label={day.label}
-                          sub={day.sub}
-                          color={COL_COLORS.day}
-                          taskList={dayTasks(day.str)}
-                          isPast={isPast}
-                        />
-                      )
-                    })}
+                    <div className="w-1.5 h-1.5 rounded-full mt-1 shrink-0" style={{ background: COL_COLORS.this_week }} />
+                    <div className="flex-1 min-w-0">
+                      <div
+                        className="text-[11px] font-mono font-semibold uppercase tracking-widest leading-tight flex items-center gap-1"
+                        style={{ color: COL_COLORS.this_week }}
+                      >
+                        This Week
+                        <span style={{ opacity: 0.55, fontSize: 10, letterSpacing: 0 }}>↗</span>
+                      </div>
+                      <div className="text-[10px] font-mono leading-tight mt-0.5" style={{ color: 'var(--ink-4)' }}>
+                        {weekDays[0].sub} – {weekDays[6].sub}
+                      </div>
+                    </div>
+                    {thisWeekTotal > 0 && (
+                      <span className="text-[10px] font-mono mt-0.5 shrink-0" style={{ color: 'var(--ink-4)' }}>
+                        {thisWeekTotal}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Task list preview (non-today week tasks) */}
+                  <div className="flex flex-col gap-1.5 overflow-y-auto flex-1">
+                    {loading ? (
+                      <p className="text-[10px] px-1 font-mono" style={{ color: 'var(--ink-4)' }}>…</p>
+                    ) : thisWeekNonTodayTasks.length === 0 ? (
+                      <p className="text-[10px] px-1 font-mono" style={{ color: 'var(--ink-4)', opacity: 0.5 }}>
+                        No tasks
+                      </p>
+                    ) : thisWeekNonTodayTasks.map(t => (
+                      <TaskCard key={t.id} task={t} showDate
+                        onClick={() => openDrawer(t)}
+                        onComplete={() => completeTask(t.id)}
+                        onDelete={() => deleteTask(t.id)}
+                      />
+                    ))}
                   </div>
+
+                  {/* Expand prompt */}
+                  <button
+                    onClick={() => setWeekOpen(true)}
+                    className="w-full text-left text-[10px] px-1 py-1 rounded opacity-0 group-hover/week:opacity-100 transition-opacity"
+                    style={{ color: COL_COLORS.this_week }}
+                  >
+                    ↗ View by day
+                  </button>
                 </div>
 
-                {/* Group separator */}
-                <div className="w-px shrink-0 self-stretch mx-2.5" style={{ background: 'oklch(1 0 0 / 0.06)' }} />
+                <div className="w-px shrink-0 self-stretch mr-2.5" style={{ background: 'oklch(1 0 0 / 0.06)' }} />
 
                 {/* ── This Month ── */}
                 <div className="mr-2.5 shrink-0">
@@ -625,28 +749,13 @@ export default function CRMPage() {
                 </div>
 
                 {/* ── Someday ── */}
-                <div className="mr-2.5 shrink-0">
+                <div className="shrink-0">
                   <KanbanCol
                     colId="someday"
                     label="Someday"
                     sub="No date"
                     color={COL_COLORS.someday}
                     taskList={somedayTasks}
-                  />
-                </div>
-
-                {/* Group separator */}
-                <div className="w-px shrink-0 self-stretch mr-2.5" style={{ background: 'oklch(1 0 0 / 0.06)' }} />
-
-                {/* ── Backlog ── */}
-                <div className="shrink-0">
-                  <KanbanCol
-                    colId="backlog"
-                    label="Backlog"
-                    sub="Unscheduled"
-                    color={COL_COLORS.backlog}
-                    taskList={backlogTasks}
-                    showDate={true}
                   />
                 </div>
 
