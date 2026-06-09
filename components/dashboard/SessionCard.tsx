@@ -52,7 +52,7 @@ export function SessionCard() {
         } else if (d.defaults?.wake_time) {
           setWake(d.defaults.wake_time)
         }
-        setFormOpen(!d.plan) // no plan yet → start with the intake form
+        setFormOpen(!d.intake) // show form until intake is submitted at least once today
         setPlanLoading(false)
       })
       .catch(() => setPlanLoading(false))
