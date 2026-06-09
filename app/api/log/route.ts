@@ -35,14 +35,19 @@ export async function GET(req: NextRequest) {
   ])
   const notes = dayRow?.notes ?? {}
 
-  // Morning routine
+  // Morning routine — completions are stored as a { itemId: ISO-timestamp } map
+  // (NOT a { done: [...] } array), so read keys off the map directly.
   const items: { id: string; label: string }[] = cfgRow?.notes?.morning_routine_items ?? DEFAULT_ROUTINE
-  const doneIds = new Set<string>(notes.morning_routine?.done ?? [])
+  const completionsMap = (notes.morning_routine ?? {}) as Record<string, string>
+  const doneIds = new Set<string>(Object.keys(completionsMap))
   const routine = {
     total: items.length,
     done: items.filter(i => doneIds.has(i.id)).map(i => i.label),
     missed: items.filter(i => !doneIds.has(i.id)).map(i => i.label),
   }
+
+  // Chronological activity feed for the day (real-time entries)
+  const activity = Array.isArray(notes.activity) ? notes.activity : []
 
   // Habits
   const habitsDone: string[] = notes.habits?.done ?? []
@@ -62,7 +67,7 @@ export async function GET(req: NextRequest) {
     .filter(t => laDate(t.completed_at) === date)
     .sort((a, b) => +new Date(b.completed_at) - +new Date(a.completed_at))
 
-  return NextResponse.json({ date, routine, habits, gym, tasks, notes: notes.log_notes ?? '' })
+  return NextResponse.json({ date, routine, habits, gym, tasks, activity, notes: notes.log_notes ?? '' })
 }
 
 export async function POST(req: NextRequest) {

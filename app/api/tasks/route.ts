@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient, USER_ID } from '@/lib/supabase'
 import { embedMemory } from '@/lib/embed'
 import { createTaskEvent } from '@/lib/gcal'
+import { isMissingSchemaError, stripNewTaskColumns } from '@/lib/taskColumns'
 
 export async function GET(req: NextRequest) {
   const db = getServiceClient()
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
   const db = getServiceClient()
   const body = await req.json()
 
-  const { data, error } = await db.from('tasks').insert({
+  const payload = {
     user_id: USER_ID,
     title: body.title,
     description: body.description ?? null,
@@ -40,20 +41,30 @@ export async function POST(req: NextRequest) {
     time_estimate_min: body.time_estimate_min ?? null,
     tags: body.tags ?? [],
     due_date: body.due_date ?? null,
+    start_time: body.start_time ?? null,
+    duration_min: body.duration_min ?? null,
+    recurring: body.recurring ?? false,
     owner: body.owner ?? null,
     entity_id: body.entity_id ?? null,
-  }).select().single()
+  }
 
+  let { data, error } = await db.from('tasks').insert(payload).select().single()
+  // Pre-migration fallback: retry without the new (time-block / recurring) columns
+  if (error && isMissingSchemaError(error)) {
+    ;({ data, error } = await db.from('tasks').insert(stripNewTaskColumns(payload)).select().single())
+  }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Create Google Calendar event if task has a due date
-  if (data.due_date) {
+  // Create Google Calendar event if task has a due date or a time block
+  if (data.due_date || data.start_time) {
     try {
       const eventId = await createTaskEvent({
         id: data.id,
         title: data.title,
         description: data.description,
         due_date: data.due_date,
+        start_time: data.start_time,
+        duration_min: data.duration_min,
         urgency: data.urgency,
         tags: data.tags as string[],
       })
