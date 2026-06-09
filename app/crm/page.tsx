@@ -641,7 +641,7 @@ export default function CRMPage() {
           {/* ── Kanban ─────────────────────────────────────────────────────── */}
           {view === 'kanban' && (
             <div className="flex-1 overflow-hidden">
-              <div className="flex h-full overflow-x-auto pb-2 gap-3">
+              <div className="flex w-full h-full overflow-x-auto pb-2 gap-3">
 
                 {/* ── Overdue (conditional) ── */}
                 {overdueTasks.length > 0 && (
