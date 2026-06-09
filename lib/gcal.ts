@@ -1,6 +1,7 @@
 import { google } from 'googleapis'
 
 const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID ?? 'primary'
+const TZ = process.env.USER_TIMEZONE || 'America/Los_Angeles'
 
 export function isGCalConfigured() {
   return !!(
@@ -40,15 +41,42 @@ function buildDescription(task: {
   return parts.join('\n')
 }
 
+// Build the start/end of a calendar event. If a time block (start_time +
+// optional duration) is set we create a TIMED event; otherwise an all-day event
+// anchored on due_date.
+function buildWhen(task: {
+  due_date?: string | null
+  start_time?: string | null
+  duration_min?: number | null
+}): { start: Record<string, string>; end: Record<string, string> } | null {
+  if (task.start_time) {
+    const start = new Date(task.start_time)
+    const mins = task.duration_min && task.duration_min > 0 ? task.duration_min : 60
+    const end = new Date(start.getTime() + mins * 60_000)
+    return {
+      start: { dateTime: start.toISOString(), timeZone: TZ },
+      end: { dateTime: end.toISOString(), timeZone: TZ },
+    }
+  }
+  if (task.due_date) {
+    return { start: { date: task.due_date }, end: { date: nextDay(task.due_date) } }
+  }
+  return null
+}
+
 export async function createTaskEvent(task: {
   id: string
   title: string
   description?: string | null
   due_date?: string | null
+  start_time?: string | null
+  duration_min?: number | null
   urgency?: string
   tags?: string[]
 }): Promise<string | null> {
-  if (!isGCalConfigured() || !task.due_date) return null
+  if (!isGCalConfigured()) return null
+  const when = buildWhen(task)
+  if (!when) return null
 
   const cal = getCalendar()
   const { data } = await cal.events.insert({
@@ -56,8 +84,7 @@ export async function createTaskEvent(task: {
     requestBody: {
       summary: `📋 ${task.title}`,
       description: buildDescription(task),
-      start: { date: task.due_date },
-      end: { date: nextDay(task.due_date) },
+      ...when,
     },
   })
   return data.id ?? null
@@ -69,6 +96,8 @@ export async function updateTaskEvent(
     title?: string
     description?: string | null
     due_date?: string | null
+    start_time?: string | null
+    duration_min?: number | null
     urgency?: string
     tags?: string[]
     taskId?: string
@@ -79,11 +108,14 @@ export async function updateTaskEvent(
 
   const body: Record<string, unknown> = {}
   if (patch.title !== undefined) body.summary = `📋 ${patch.title}`
-  if (patch.due_date !== undefined) {
-    if (patch.due_date) {
-      body.start = { date: patch.due_date }
-      body.end = { date: nextDay(patch.due_date) }
-    }
+  // Re-derive timing whenever a timing field is part of the patch
+  if (patch.start_time !== undefined || patch.duration_min !== undefined || patch.due_date !== undefined) {
+    const when = buildWhen({
+      due_date: patch.due_date,
+      start_time: patch.start_time,
+      duration_min: patch.duration_min,
+    })
+    if (when) { body.start = when.start; body.end = when.end }
   }
   if (patch.description !== undefined || patch.urgency !== undefined || patch.tags !== undefined) {
     body.description = buildDescription({

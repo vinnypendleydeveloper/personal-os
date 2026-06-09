@@ -1,61 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient, USER_ID } from '@/lib/supabase'
 import { buildContext, buildSystemPrompt, loadConversationMemory } from '@/lib/personalContext'
+import { streamChat, type AiMsg as Msg } from '@/lib/ai'
 import OpenAI from 'openai'
-import Anthropic from '@anthropic-ai/sdk'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-
-type Msg = { role: 'user' | 'assistant'; content: string }
-
-async function streamFromAnthropic(system: string, messages: Msg[]): Promise<ReadableStream> {
-  const encoder = new TextEncoder()
-  const stream = await anthropic.messages.create({
-    model: process.env.ANTHROPIC_MODEL ?? 'claude-haiku-4-5-20251001',
-    max_tokens: 700,
-    stream: true,
-    system,
-    messages,
-  })
-  return new ReadableStream({
-    async start(controller) {
-      for await (const event of stream) {
-        if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-          controller.enqueue(encoder.encode(event.delta.text))
-        }
-      }
-      controller.close()
-    },
-  })
-}
-
-async function streamFromOpenAI(system: string, messages: Msg[]): Promise<ReadableStream> {
-  const encoder = new TextEncoder()
-  const stream = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    max_tokens: 700,
-    stream: true,
-    messages: [{ role: 'system', content: system }, ...messages],
-  })
-  return new ReadableStream({
-    async start(controller) {
-      for await (const chunk of stream) {
-        const text = chunk.choices[0]?.delta?.content ?? ''
-        if (text) controller.enqueue(encoder.encode(text))
-      }
-      controller.close()
-    },
-  })
-}
-
-async function tryStream(system: string, messages: Msg[]): Promise<ReadableStream> {
-  try {
-    return await streamFromAnthropic(system, messages)
-  } catch {
-    return await streamFromOpenAI(system, messages)
-  }
-}
 
 export async function POST(req: NextRequest) {
   const db = getServiceClient()
@@ -63,12 +12,18 @@ export async function POST(req: NextRequest) {
   // Accept either a single { question } or a multi-turn { history: Msg[] }
   const history: Msg[] = Array.isArray(body.history) ? body.history : []
   const question: string = body.question ?? history[history.length - 1]?.content ?? ''
+  const plan: string = typeof body.plan === 'string' ? body.plan : ''
   if (!question?.trim() && history.length === 0) {
     return NextResponse.json({ error: 'No question' }, { status: 400 })
   }
 
   const contextBlocks = await buildContext(db)
   let systemPrompt = buildSystemPrompt(contextBlocks)
+
+  // The day's current plan, so the assistant can reason about and edit it
+  if (plan.trim()) {
+    systemPrompt += `\n\n=== TODAY'S CURRENT PLAN (the one Vinny is looking at) ===\n${plan}\n\nWhen Vinny asks to change his day ("move my 2pm earlier", "add a gym block at 6pm", "what should I skip?"), respond by restating the affected part of the plan with the change applied — concrete times and task names — not vague advice. Keep edits consistent with his real calendar events and task time blocks above. Markdown, tight, no filler.`
+  }
 
   // Semantic memory recall
   try {
@@ -96,6 +51,6 @@ export async function POST(req: NextRequest) {
     messages = [...memory, { role: 'user', content: question }]
   }
 
-  const stream = await tryStream(systemPrompt, messages)
+  const stream = await streamChat({ system: systemPrompt, messages, maxTokens: 800 })
   return new NextResponse(stream, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
 }

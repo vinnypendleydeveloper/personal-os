@@ -8,6 +8,17 @@ import { Panel } from '@/components/dashboard/Panel'
 type Priority = 'high' | 'medium' | 'low' | 'none'
 type View = 'kanban' | 'smart'
 
+interface AiMeta {
+  category?: string[]
+  priority?: string
+  recurring?: boolean
+  recurring_confidence?: number
+  reasoning?: string
+  original_title?: string
+  original_priority_score?: number
+  needs_confirmation?: boolean
+}
+
 interface Task {
   id: string
   title: string
@@ -18,6 +29,12 @@ interface Task {
   time_estimate_min: number | null
   tags: string[]
   due_date: string | null
+  start_time: string | null
+  duration_min: number | null
+  recurring: boolean
+  ai_enriched: boolean
+  ai_meta: AiMeta | null
+  gcal_event_id: string | null
   completed_at: string | null
 }
 
@@ -58,6 +75,24 @@ function getWeekDays(): { str: string; label: string; sub: string }[] {
 function fmtDate(s: string) {
   const [, m, d] = s.split('-').map(Number)
   return `${MONTH_NAMES[m - 1]} ${d}`
+}
+
+// ─── Time-block helpers ─────────────────────────────────────────────────────────
+function fmtClock(iso: string) {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+}
+// "HH:MM" (local) extracted from an ISO timestamp, for <input type="time">
+function isoToTimeInput(iso: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+// Combine a YYYY-MM-DD date and "HH:MM" into a local ISO timestamp
+function timeInputToIso(dateStr: string, time: string): string | null {
+  if (!time) return null
+  const [h, m] = time.split(':').map(Number)
+  const [y, mo, d] = dateStr.split('-').map(Number)
+  return new Date(y, mo - 1, d, h, m, 0, 0).toISOString()
 }
 
 // ─── Column colors ────────────────────────────────────────────────────────────
@@ -101,13 +136,17 @@ function Chip({ label, color, filled = false }: { label: string; color: string; 
 }
 
 // ─── TaskCard ─────────────────────────────────────────────────────────────────
-function TaskCard({ task, onClick, onComplete, onDelete, showDate = false }: {
-  task: Task; onClick: () => void; onComplete: () => void; onDelete: () => void; showDate?: boolean
+function TaskCard({ task, onClick, onComplete, onDelete, onSparkle, onSyncGcal, reason, syncing = false, showDate = false }: {
+  task: Task; onClick: () => void; onComplete: () => void; onDelete: () => void
+  onSparkle?: (task: Task, e: React.MouseEvent) => void
+  onSyncGcal?: (task: Task) => void
+  reason?: string; syncing?: boolean; showDate?: boolean
 }) {
   const p    = scoreToPriority(task.priority_score)
   const pCfg = PRIORITY_CFG[p]
   const today   = todayStr()
   const overdue = !!(task.due_date && task.due_date < today)
+  const needsConfirm = task.ai_enriched && task.ai_meta?.needs_confirmation
 
   return (
     <div
@@ -120,7 +159,26 @@ function TaskCard({ task, onClick, onComplete, onDelete, showDate = false }: {
         <p className="text-xs flex-1 leading-relaxed line-clamp-2" style={{ color: 'var(--foreground)' }}>
           {task.title}
         </p>
+        {/* AI enrichment sparkle */}
+        {task.ai_enriched && (
+          <button
+            onClick={e => { e.stopPropagation(); onSparkle?.(task, e) }}
+            title={task.ai_meta?.reasoning || 'AI-categorized — tap to view'}
+            className="shrink-0 leading-none transition-transform hover:scale-125"
+            style={{ fontSize: 10, marginTop: 1, color: needsConfirm ? 'var(--warn)' : 'var(--accent)', filter: 'drop-shadow(0 0 3px currentColor)' }}
+          >✦</button>
+        )}
+        {/* Synced-to-calendar indicator */}
+        {task.gcal_event_id && (
+          <span title="Synced to Google Calendar" className="shrink-0 leading-none" style={{ fontSize: 9, marginTop: 1.5 }}>📅</span>
+        )}
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-0.5">
+          {!task.gcal_event_id && onSyncGcal && (
+            <button onClick={e => { e.stopPropagation(); onSyncGcal(task) }} disabled={syncing}
+              title="Add to Google Calendar"
+              className="text-[10px] px-1 py-0.5 rounded leading-none disabled:opacity-40"
+              style={{ color: 'var(--accent)', background: 'var(--accent-dim)' }}>{syncing ? '·' : '＋📅'}</button>
+          )}
           <button onClick={e => { e.stopPropagation(); onComplete() }}
             className="text-[10px] px-1 py-0.5 rounded leading-none"
             style={{ color: 'var(--ok)', background: 'oklch(0.72 0.18 145 / 0.15)' }}>✓</button>
@@ -131,6 +189,13 @@ function TaskCard({ task, onClick, onComplete, onDelete, showDate = false }: {
       </div>
       <div className="flex gap-1 mt-1.5 flex-wrap items-center">
         {p !== 'none' && <Chip label={pCfg.label} color={pCfg.color} filled={p === 'high'} />}
+        {/* Time block */}
+        {task.start_time && (
+          <span className="font-mono flex items-center gap-0.5" style={{ fontSize: 9, color: 'var(--accent)' }}>
+            ◷ {fmtClock(task.start_time)}{task.duration_min ? ` · ${task.duration_min}m` : ''}
+          </span>
+        )}
+        {task.recurring && <Chip label="DAILY" color="oklch(0.70 0.16 250)" />}
         {showDate && task.due_date && (
           <Chip
             label={overdue ? `OVERDUE ${fmtDate(task.due_date)}` : fmtDate(task.due_date)}
@@ -145,6 +210,12 @@ function TaskCard({ task, onClick, onComplete, onDelete, showDate = false }: {
           <span key={tag} className="font-mono" style={{ fontSize: 9, color: 'var(--ink-4)' }}>#{tag}</span>
         ))}
       </div>
+      {/* Prioritize-my-day reason */}
+      {reason && (
+        <p className="mt-1 leading-snug" style={{ fontSize: 10, color: 'var(--accent)', opacity: 0.85 }}>
+          → {reason}
+        </p>
+      )}
     </div>
   )
 }
@@ -213,6 +284,17 @@ export default function CRMPage() {
   const [smartIds,     setSmartIds]     = useState<string[] | null>(null)
   const [smartLoading, setSmartLoading] = useState(false)
 
+  // Time block (drawer)
+  const [editStartTime, setEditStartTime] = useState('') // "HH:MM"
+  const [editDuration,  setEditDuration]  = useState('') // minutes
+
+  // AI intelligence
+  const [syncingId,    setSyncingId]    = useState<string | null>(null)
+  const [prioritizing, setPrioritizing] = useState(false)
+  const [rankById,     setRankById]     = useState<Record<string, number> | null>(null)
+  const [reasonById,   setReasonById]   = useState<Record<string, string>>({})
+  const [aiPopover,    setAiPopover]    = useState<{ task: Task; x: number; y: number } | null>(null)
+
   const dirtyRef = useRef(false)
 
   useEffect(() => { fetchTasks() }, [])
@@ -267,6 +349,81 @@ export default function CRMPage() {
     if (opts?.colId) { setQuickTitle(''); setQuickColId(null) }
     else { setNewTitle(''); setNewKey(false) }
     setAdding(false)
+
+    // Background: silently enrich with AI, then merge the result into the card
+    if (task?.id) enrichNewTask(task.id)
+  }
+
+  // Silent AI enrichment — fired after a task is created. Merges category,
+  // priority, recurring + the sparkle indicator back onto the card when done.
+  async function enrichNewTask(id: string) {
+    try {
+      const res = await fetch('/api/tasks/enrich', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      const { task: enriched } = await res.json()
+      if (enriched) {
+        dirtyRef.current = true
+        setTasks(prev => prev.map(t => (t.id === id ? { ...t, ...enriched } : t)))
+      }
+    } catch { /* non-fatal — task already exists */ }
+  }
+
+  // Explicit "Add to Google Calendar" on a card
+  async function syncGcal(task: Task) {
+    setSyncingId(task.id)
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sync_gcal: true }),
+      })
+      const { task: updated } = await res.json()
+      if (updated?.gcal_event_id) {
+        dirtyRef.current = true
+        setTasks(prev => prev.map(t => (t.id === task.id ? { ...t, gcal_event_id: updated.gcal_event_id } : t)))
+      }
+    } catch { /* non-fatal */ }
+    setSyncingId(null)
+  }
+
+  // "Prioritize My Day" — AI reorders all open tasks with brief reasons
+  async function prioritizeDay() {
+    setPrioritizing(true)
+    try {
+      const res = await fetch('/api/tasks/prioritize', { method: 'POST' })
+      const { order } = await res.json()
+      if (Array.isArray(order) && order.length) {
+        const rank: Record<string, number> = {}
+        const reasons: Record<string, string> = {}
+        order.forEach((o: { id: string; reason: string }, i: number) => {
+          rank[o.id] = i
+          if (o.reason) reasons[o.id] = o.reason
+        })
+        setRankById(rank)
+        setReasonById(reasons)
+      }
+    } catch { /* non-fatal */ }
+    setPrioritizing(false)
+  }
+
+  function clearPrioritize() { setRankById(null); setReasonById({}) }
+
+  function openAiPopover(task: Task, e: React.MouseEvent) {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setAiPopover({ task, x: rect.left, y: rect.bottom + 6 })
+  }
+
+  // Quick recurring confirm from the popover (records an override for learning)
+  async function confirmRecurring(task: Task, recurring: boolean) {
+    dirtyRef.current = true
+    const nextMeta = { ...(task.ai_meta ?? {}), recurring, needs_confirmation: false }
+    setTasks(prev => prev.map(t => (t.id === task.id ? { ...t, recurring, ai_meta: nextMeta } : t)))
+    setAiPopover(null)
+    await fetch(`/api/tasks/${task.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recurring, ai_meta: nextMeta, ai_override: true }),
+    })
   }
 
   async function completeTask(id: string) {
@@ -294,6 +451,8 @@ export default function CRMPage() {
     setEditDate(task.due_date ?? '')
     setEditUrgency(task.due_date ? '' : (task.urgency === 'this_week' ? '' : task.urgency))
     setEditKey(task.key)
+    setEditStartTime(isoToTimeInput(task.start_time))
+    setEditDuration(task.duration_min != null ? String(task.duration_min) : '')
   }
 
   async function saveDrawer() {
@@ -307,14 +466,24 @@ export default function CRMPage() {
       else if (weekDateSet.has(editDate)) urgency = 'this_week'
       else urgency = 'someday'
     }
+    // Time block: anchor the chosen time on the due date (or today if none)
+    const anchorDate = editDate || today
+    const start_time = editStartTime ? timeInputToIso(anchorDate, editStartTime) : null
+    const durationNum = editDuration ? Math.max(0, parseInt(editDuration, 10)) || null : null
+
+    // If Vinny edited an AI-enriched task, mark it as an override so the AI learns
+    const aiOverride = !!selected.ai_enriched
+
     const updated: Task = { ...selected, title: editTitle, description: editDesc, priority_score: pScore,
-      due_date: editDate || null, urgency, key: editKey }
+      due_date: editDate || null, urgency, key: editKey, start_time, duration_min: durationNum }
     setTasks(prev => prev.map(t => t.id === selected.id ? updated : t))
     setSelected(updated)
     await fetch(`/api/tasks/${selected.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: editTitle, description: editDesc, priority_score: pScore,
-        due_date: editDate || null, urgency, key: editKey }),
+        due_date: editDate || null, urgency, key: editKey, start_time, duration_min: durationNum,
+        recurring: selected.recurring,
+        ...(aiOverride ? { ai_override: true } : {}) }),
     })
     setSaving(false)
   }
@@ -332,7 +501,19 @@ export default function CRMPage() {
   }
 
   // ── Bucketed task lists ────────────────────────────────────────────────────
-  const sorted = (arr: Task[]) => [...arr].sort((a, b) => b.priority_score - a.priority_score)
+  const sorted = (arr: Task[]) => [...arr].sort((a, b) => {
+    // "Prioritize my day" ranking overrides everything while active
+    if (rankById) {
+      const ra = rankById[a.id] ?? Infinity
+      const rb = rankById[b.id] ?? Infinity
+      if (ra !== rb) return ra - rb
+    }
+    // Time-blocked tasks float to the top in chronological order
+    if (a.start_time && b.start_time) return a.start_time < b.start_time ? -1 : a.start_time > b.start_time ? 1 : 0
+    if (a.start_time) return -1
+    if (b.start_time) return 1
+    return b.priority_score - a.priority_score
+  })
 
   const overdueTasks   = sorted(tasks.filter(t => getBucket(t, today, weekDateSet) === 'overdue'))
   const todayTasks     = sorted(tasks.filter(t => getBucket(t, today, weekDateSet) === 'today'))
@@ -394,6 +575,8 @@ export default function CRMPage() {
               onClick={() => openDrawer(t)}
               onComplete={() => completeTask(t.id)}
               onDelete={() => deleteTask(t.id)}
+              onSparkle={openAiPopover} onSyncGcal={syncGcal}
+              reason={reasonById[t.id]} syncing={syncingId === t.id}
             />
           ))}
         </div>
@@ -558,6 +741,70 @@ export default function CRMPage() {
       {/* Week overlay — rendered at Shell root so it covers full content area */}
       {weekOpen && <WeekOverlay />}
 
+      {/* AI enrichment popover */}
+      {aiPopover && (() => {
+        const t = aiPopover.task
+        const meta = t.ai_meta ?? {}
+        const tags = meta.category ?? (t.tags ?? []).filter(x => !x.startsWith('@'))
+        return (
+          <>
+            <div className="fixed inset-0 z-[60]" onClick={() => setAiPopover(null)} />
+            <div
+              className="fixed z-[61] flex flex-col gap-2 panel animate-fade-up"
+              style={{
+                left: Math.min(aiPopover.x, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 280),
+                top: aiPopover.y, width: 264, padding: 12,
+                background: 'var(--bg-1)', border: '1px solid var(--accent-glow)',
+                boxShadow: '0 12px 40px oklch(0 0 0 / 0.5)',
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono font-semibold uppercase tracking-widest flex items-center gap-1" style={{ color: 'var(--accent)' }}>
+                  ✦ AI Enrichment
+                </span>
+                <button onClick={() => setAiPopover(null)} style={{ color: 'var(--ink-4)', fontSize: 11 }}>✕</button>
+              </div>
+
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {meta.priority && <Chip label={meta.priority.toUpperCase()} color={PRIORITY_CFG[scoreToPriority(t.priority_score)].color} />}
+                <Chip label={t.recurring ? 'DAILY' : 'ONE-TIME'} color={t.recurring ? 'oklch(0.70 0.16 250)' : 'var(--ink-4)'} />
+                {tags.map(tag => (
+                  <span key={tag} className="font-mono" style={{ fontSize: 9, color: 'var(--ink-4)' }}>#{tag}</span>
+                ))}
+              </div>
+
+              {meta.reasoning && (
+                <p className="text-xs leading-snug" style={{ color: 'var(--fg-2)' }}>{meta.reasoning}</p>
+              )}
+
+              {meta.original_title && meta.original_title !== t.title && (
+                <p className="text-[10px] font-mono leading-snug" style={{ color: 'var(--ink-4)' }}>
+                  Rewrote from: &ldquo;{meta.original_title}&rdquo;
+                </p>
+              )}
+
+              {meta.needs_confirmation && (
+                <div className="flex flex-col gap-1.5 pt-1" style={{ borderTop: '1px solid var(--border)' }}>
+                  <span className="text-[10px] font-mono" style={{ color: 'var(--warn)' }}>Is this a daily/recurring task?</span>
+                  <div className="flex gap-1.5">
+                    <button onClick={() => confirmRecurring(t, true)}
+                      className="flex-1 text-[10px] py-1 rounded font-mono"
+                      style={{ background: 'oklch(0.70 0.16 250 / 0.15)', color: 'oklch(0.70 0.16 250)', border: '1px solid oklch(0.70 0.16 250 / 0.4)' }}>Daily</button>
+                    <button onClick={() => confirmRecurring(t, false)}
+                      className="flex-1 text-[10px] py-1 rounded font-mono"
+                      style={{ background: 'var(--ink-2)', color: 'var(--ink-4)', border: '1px solid var(--border)' }}>One-time</button>
+                  </div>
+                </div>
+              )}
+
+              <button onClick={() => { openDrawer(t); setAiPopover(null) }}
+                className="text-[10px] font-mono text-left mt-0.5 transition-opacity hover:opacity-70"
+                style={{ color: 'var(--accent)' }}>Edit details →</button>
+            </div>
+          </>
+        )
+      })()}
+
       <div className="flex gap-4 h-[calc(100vh-64px)]">
 
         {/* Main area */}
@@ -577,6 +824,23 @@ export default function CRMPage() {
                     }}>{v}</button>
                 ))}
               </div>
+
+              {/* Prioritize My Day */}
+              {view === 'kanban' && (
+                rankById ? (
+                  <button onClick={clearPrioritize}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors"
+                    style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}>
+                    ✦ Prioritized · clear
+                  </button>
+                ) : (
+                  <button onClick={prioritizeDay} disabled={prioritizing}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all hover:brightness-110 disabled:opacity-50"
+                    style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}>
+                    {prioritizing ? '✦ Thinking…' : '✦ Prioritize My Day'}
+                  </button>
+                )
+              )}
 
               <div className="flex-1" />
 
@@ -655,6 +919,8 @@ export default function CRMPage() {
                             onClick={() => openDrawer(t)}
                             onComplete={() => completeTask(t.id)}
                             onDelete={() => deleteTask(t.id)}
+                            onSparkle={openAiPopover} onSyncGcal={syncGcal}
+                            reason={reasonById[t.id]} syncing={syncingId === t.id}
                           />
                         ))}
                       </div>
@@ -719,6 +985,8 @@ export default function CRMPage() {
                         onClick={() => openDrawer(t)}
                         onComplete={() => completeTask(t.id)}
                         onDelete={() => deleteTask(t.id)}
+                        onSparkle={openAiPopover} onSyncGcal={syncGcal}
+                        reason={reasonById[t.id]} syncing={syncingId === t.id}
                       />
                     ))}
                   </div>
@@ -788,6 +1056,8 @@ export default function CRMPage() {
                               onClick={() => openDrawer(task)}
                               onComplete={() => completeTask(task.id)}
                               onDelete={() => deleteTask(task.id)}
+                              onSparkle={openAiPopover} onSyncGcal={syncGcal}
+                              reason={reasonById[task.id]} syncing={syncingId === task.id}
                             />
                           </div>
                         </div>
@@ -879,6 +1149,45 @@ export default function CRMPage() {
                     style={{ color: 'var(--ink-4)' }}>Clear date</button>
                 )}
               </div>
+
+              {/* Time block */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-mono uppercase tracking-widest" style={{ color: 'var(--ink-4)' }}>
+                  Time Block
+                </label>
+                <div className="flex gap-1.5 items-center">
+                  <input type="time" value={editStartTime}
+                    onChange={e => setEditStartTime(e.target.value)}
+                    className="flex-1 text-xs px-2 py-1.5 rounded outline-none"
+                    style={{ background: 'var(--ink-2)', color: 'var(--foreground)', border: '1px solid oklch(1 0 0 / 0.08)', colorScheme: 'dark' }}
+                  />
+                  <div className="flex items-center gap-1">
+                    <input type="number" min={0} step={15} value={editDuration}
+                      onChange={e => setEditDuration(e.target.value)}
+                      placeholder="60"
+                      className="w-14 text-xs px-2 py-1.5 rounded outline-none"
+                      style={{ background: 'var(--ink-2)', color: 'var(--foreground)', border: '1px solid oklch(1 0 0 / 0.08)' }}
+                    />
+                    <span className="text-[10px] font-mono" style={{ color: 'var(--ink-4)' }}>min</span>
+                  </div>
+                </div>
+                {editStartTime && (
+                  <button onClick={() => { setEditStartTime(''); setEditDuration('') }}
+                    className="text-[10px] text-left opacity-60 hover:opacity-100"
+                    style={{ color: 'var(--ink-4)' }}>Clear time block</button>
+                )}
+              </div>
+
+              {/* Recurring */}
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <div onClick={() => selected && setSelected({ ...selected, recurring: !selected.recurring })}
+                  className="w-4 h-4 rounded border flex items-center justify-center shrink-0"
+                  style={{ background: selected?.recurring ? 'oklch(0.70 0.16 250)' : 'transparent', borderColor: selected?.recurring ? 'oklch(0.70 0.16 250)' : 'oklch(1 0 0 / 0.2)' }}
+                >
+                  {selected?.recurring && <span className="text-[10px] leading-none" style={{ color: 'oklch(0.10 0 0)' }}>↻</span>}
+                </div>
+                <span className="text-xs" style={{ color: 'var(--ink-4)' }}>Recurring / daily task</span>
+              </label>
 
               {/* Key task */}
               <label className="flex items-center gap-2 cursor-pointer select-none">

@@ -25,6 +25,7 @@ interface WhoopSnapshot {
   strain: number | null
 }
 
+interface RoutineIntake { energy?: string; focus?: string; note?: string }
 interface DebriefData {
   wake_time: string | null
   whoop_connected: boolean
@@ -33,6 +34,8 @@ interface DebriefData {
   averages: { sleep_7d: number | null; hrv_7d: number | null; recovery_7d: number | null; sample_days: number }
   comparisons: string[]
   due_tasks: { id: string; title: string; urgency: string; tags: string[] }[]
+  routine: { done: number; total: number; doneLabels: string[]; remainingLabels: string[]; allDone: boolean } | null
+  intake: RoutineIntake | null
   debrief_message: string | null
 }
 
@@ -212,11 +215,10 @@ function ComparisonChip({ text }: { text: string }) {
 // ── Debrief message renderer ───────────────────────────────────
 
 const SECTION_HEADERS = [
-  'MORNING ROUTINE — DO THESE NOW',
-  "TODAY'S PLAN",
+  'WHERE YOU STAND',
+  'NEXT 1–2 HOURS',
   'BODY STATUS',
-  'SLEEP CHECK',
-  'CLOSING',
+  'ONE MOVE',
 ]
 // Matches any of the known headers (with optional trailing colon)
 const SECTION_RE = new RegExp(
@@ -286,16 +288,54 @@ function DebriefMessage({ text, accentColor }: { text: string; accentColor: stri
 
 // ── Morning Debrief panel ──────────────────────────────────────
 
+const ENERGY_OPTS = [
+  { v: 'low', label: 'Low' },
+  { v: 'medium', label: 'Medium' },
+  { v: 'high', label: 'High' },
+]
+
 function MorningDebrief() {
   const [data, setData] = useState<DebriefData | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // Intake form
+  const [formOpen, setFormOpen] = useState(false)
+  const [energy, setEnergy] = useState('')
+  const [focus, setFocus] = useState('')
+  const [note, setNote] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
   useEffect(() => {
     fetch('/api/debrief')
       .then(r => r.json())
-      .then((d: DebriefData) => { setData(d); setLoading(false) })
+      .then((d: DebriefData) => {
+        setData(d)
+        const hasIntake = !!(d.intake && (d.intake.energy || d.intake.focus || d.intake.note))
+        if (d.intake) {
+          setEnergy(d.intake.energy ?? '')
+          setFocus(d.intake.focus ?? '')
+          setNote(d.intake.note ?? '')
+        }
+        // Open the form automatically if Vinny hasn't done a real intake yet today
+        setFormOpen(!hasIntake)
+        setLoading(false)
+      })
       .catch(() => setLoading(false))
   }, [])
+
+  async function submitIntake() {
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/debrief', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ energy, focus, note }),
+      })
+      const d: DebriefData = await res.json()
+      setData(d)
+      setFormOpen(false)
+    } catch { /* keep form open */ }
+    setSubmitting(false)
+  }
 
   const wakeStr = data?.wake_time
     ? new Date(data.wake_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
@@ -387,6 +427,60 @@ function MorningDebrief() {
             <div className="flex flex-wrap gap-1.5">
               {data.comparisons.map((c, i) => <ComparisonChip key={i} text={c} />)}
             </div>
+          )}
+
+          {/* Quick intake — 2-3 questions, all at once (not a chat) */}
+          {formOpen ? (
+            <div className="flex flex-col gap-2.5 p-3 rounded-lg" style={{ background: 'var(--bg-2)', border: '1px solid var(--border)' }}>
+              <div className="flex items-center justify-between">
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.13em', color: 'var(--accent)', textTransform: 'uppercase' }}>
+                  Quick intake — plan the next 1–2 hrs
+                </span>
+                {data?.routine && data.routine.total > 0 && (
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--fg-3)' }}>
+                    routine {data.routine.done}/{data.routine.total}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.1em', color: 'var(--fg-3)', width: 52 }}>ENERGY</span>
+                <div className="flex gap-1">
+                  {ENERGY_OPTS.map(o => (
+                    <button key={o.v} onClick={() => setEnergy(o.v)}
+                      className="text-[11px] px-2.5 py-1 rounded-md transition-all"
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        background: energy === o.v ? 'var(--accent-dim)' : 'var(--bg-3)',
+                        color: energy === o.v ? 'var(--accent)' : 'var(--fg-3)',
+                        border: `1px solid ${energy === o.v ? 'var(--accent-glow)' : 'transparent'}`,
+                      }}>
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <input value={focus} onChange={e => setFocus(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && submitIntake()}
+                placeholder="#1 thing to get done this morning…"
+                className="w-full text-sm px-2.5 py-1.5 rounded-md outline-none"
+                style={{ background: 'var(--bg-3)', border: '1px solid var(--border)', color: 'var(--fg)' }} />
+              <input value={note} onChange={e => setNote(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && submitIntake()}
+                placeholder="Anything on your mind? (optional)"
+                className="w-full text-sm px-2.5 py-1.5 rounded-md outline-none"
+                style={{ background: 'var(--bg-3)', border: '1px solid var(--border)', color: 'var(--fg)' }} />
+              <button onClick={submitIntake} disabled={submitting}
+                className="self-start text-xs px-3 py-1.5 rounded-md font-semibold disabled:opacity-40 hover:brightness-110"
+                style={{ fontFamily: 'var(--font-mono)', background: 'var(--accent)', color: 'oklch(0.09 0.008 255)' }}>
+                {submitting ? 'PLANNING…' : 'PLAN MY MORNING'}
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setFormOpen(true)}
+              className="self-start text-[10px] font-mono px-2 py-1 rounded transition-opacity hover:opacity-100"
+              style={{ color: 'var(--accent)', opacity: 0.8 }}>
+              ↻ Adjust morning intake
+            </button>
           )}
 
           {/* AI Briefing */}

@@ -18,13 +18,27 @@ function fmtHeader(key: string) {
 }
 
 interface Task { id?: string; title: string; priority_score: number; tags: string[]; completed_at: string }
+interface ActivityEntry { ts: string; type: string; message: string; meta?: Record<string, unknown> }
 interface LogData {
   date: string
   routine: { total: number; done: string[]; missed: string[] }
   habits: { hit: string[]; missed: string[] }
   gym: { day: number; label: string; whoop_strain: number | null; sauna: boolean; exercises: { name: string }[] } | null
   tasks: Task[]
+  activity: ActivityEntry[]
   notes: string
+}
+
+// Color-code activity entries by type, in the existing palette
+const ACTIVITY_COLOR: Record<string, string> = {
+  routine:         'var(--accent)',
+  routine_summary: 'var(--ok)',
+  task:            'oklch(0.74 0.16 70)',
+  habit:           'var(--warn)',
+}
+function activityColor(type: string) { return ACTIVITY_COLOR[type] ?? 'var(--fg-3)' }
+function fmtActivityTime(ts: string) {
+  return new Date(ts).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -88,6 +102,38 @@ export default function DailyLogPage() {
             <p className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)' }}>LOADING…</p>
           ) : (
             <div className="flex flex-col gap-5 mt-2">
+
+              {/* Activity timeline — real-time feed of the day */}
+              <div>
+                <SectionLabel>◢ ACTIVITY · {data.activity?.length ?? 0}</SectionLabel>
+                {!data.activity || data.activity.length === 0 ? (
+                  <p className="text-xs" style={{ color: 'var(--fg-2)' }}>No activity logged yet today.</p>
+                ) : (
+                  <div className="flex flex-col">
+                    {[...data.activity].reverse().map((a, i, arr) => {
+                      const color = activityColor(a.type)
+                      const last = i === arr.length - 1
+                      return (
+                        <div key={`${a.ts}-${i}`} className="flex gap-3 items-stretch">
+                          {/* Time */}
+                          <span className="shrink-0 tabular-nums text-right pt-px" style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-3)', width: 56 }}>
+                            {fmtActivityTime(a.ts)}
+                          </span>
+                          {/* Rail + dot */}
+                          <div className="flex flex-col items-center shrink-0" style={{ width: 9 }}>
+                            <span className="rounded-full shrink-0" style={{ width: 7, height: 7, marginTop: 4, background: color, boxShadow: `0 0 5px ${color}` }} />
+                            {!last && <span className="flex-1" style={{ width: 1, background: 'var(--border)', marginTop: 2 }} />}
+                          </div>
+                          {/* Message */}
+                          <span className="text-xs pb-2.5" style={{ color: 'var(--fg)', lineHeight: 1.45 }}>
+                            {a.message}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
 
               {/* Morning routine */}
               <div>

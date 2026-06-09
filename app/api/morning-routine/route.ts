@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient, USER_ID } from '@/lib/supabase'
+import { appendActivity } from '@/lib/activityLog'
 
 // Routine ORDER lives on the permanent config row; today's COMPLETIONS live on
 // the current day's row (so they naturally reset at midnight).
@@ -103,13 +104,42 @@ export async function POST(req: NextRequest) {
   // 2) Toggle a single item's completion for today
   if (body.kind === 'toggle' && body.itemId) {
     const items = await getItems(db)
+    const label = items.find(it => it.id === body.itemId)?.label ?? String(body.itemId)
     let completions: Record<string, string> = {}
     await upsertToday(db, notes => {
       const routine = (notes.morning_routine ?? {}) as Record<string, string>
+      const wasAllDone = notes.morning_routine_done === true
       if (body.completed) routine[body.itemId] = new Date().toISOString()
       else delete routine[body.itemId]
       notes.morning_routine = routine
-      notes.morning_routine_done = items.every(it => routine[it.id])
+
+      const total = items.length
+      const doneCount = items.filter(it => routine[it.id]).length
+      const allDone = total > 0 && doneCount === total
+      notes.morning_routine_done = allDone
+
+      // Real-time activity log entry (atomic with the completion write)
+      if (body.completed) {
+        appendActivity(notes, {
+          type: 'routine',
+          message: `Completed morning routine step: ${label}`,
+          meta: { itemId: body.itemId },
+        })
+        // Summary entry the moment the full routine is finished
+        if (allDone && !wasAllDone) {
+          appendActivity(notes, {
+            type: 'routine_summary',
+            message: `Finished morning routine — ${doneCount}/${total} complete`,
+            meta: { done: doneCount, total },
+          })
+        }
+      } else {
+        appendActivity(notes, {
+          type: 'routine',
+          message: `Unchecked routine step: ${label}`,
+          meta: { itemId: body.itemId },
+        })
+      }
       completions = routine
     })
     const streak = await computeStreak(db)
