@@ -302,7 +302,7 @@ export async function gatherDebriefData(opts: { logWake?: boolean } = {}): Promi
   try {
     const { data: hist } = await db.from('debrief_history')
       .select('log_date, kind, intake, output')
-      .eq('user_id', USER_ID).order('created_at', { ascending: false }).limit(4)
+      .eq('user_id', USER_ID).order('created_at', { ascending: false }).limit(3)
     history = (hist ?? []) as DebriefHistoryRow[]
   } catch { /* table may not exist yet */ }
 
@@ -369,7 +369,10 @@ export function historyLines(history: DebriefHistoryRow[]): string {
   if (!history.length) return '(no recent debriefs)'
   return history.map(h => {
     const intake = h.intake && Object.keys(h.intake).length ? JSON.stringify(h.intake) : '—'
-    return `${h.log_date} [${h.kind}] intake: ${intake}`
+    const snippet = h.output
+      ? `\n  → ${h.output.replace(/#+\s*/g, '').replace(/\*+/g, '').replace(/\s+/g, ' ').trim().slice(0, 200)}…`
+      : ''
+    return `${h.log_date} [${h.kind}] intake: ${intake}${snippet}`
   }).join('\n')
 }
 

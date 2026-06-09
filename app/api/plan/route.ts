@@ -34,13 +34,22 @@ You are writing Vinny's in-depth daily briefing — the full version, like a sha
 - Reference recent debriefs for continuity only when genuinely relevant.
 - Tight and high-signal — roughly 200 words. No filler, no generic motivation.`
 
+  const trendLine = data.comparisons.length ? `Trends: ${data.comparisons.join('; ')}` : ''
+  const dueTodayLine = data.dueTasks.length
+    ? `DUE TODAY: ${data.dueTasks.map(t => t.title).join(', ')}`
+    : ''
+
   const user = `Build today's full briefing. Current time: ${fmtTime(now)}.
 
 BIOMETRICS:
 Wake time: ${wake}
 Recovery: ${recoveryBand(data.whoop?.recovery_score ?? null)}
-Sleep last night: ${data.whoop?.sleep_hours != null ? `${data.whoop.sleep_hours}h` : 'unknown'}
+Sleep last night: ${data.whoop?.sleep_hours != null ? `${data.whoop.sleep_hours}h` : 'unknown'}${data.whoop?.sleep_performance != null ? ` (${data.whoop.sleep_performance}% WHOOP sleep performance)` : ''}
 HRV: ${data.whoop?.hrv != null ? `${data.whoop.hrv}ms` : 'unknown'} (7-day avg ${data.averages.hrv_7d ?? 'unknown'})
+RHR: ${data.whoop?.rhr != null ? `${data.whoop.rhr}bpm` : 'unknown'}
+Strain so far today: ${data.whoop?.strain != null ? data.whoop.strain.toFixed(1) : 'unknown'}
+7-day averages: sleep ${data.averages.sleep_7d ?? 'unknown'}h, recovery ${data.averages.recovery_7d ?? 'unknown'}%${data.averages.sample_days > 0 ? ` (${data.averages.sample_days}-day sample)` : ''}
+${trendLine}
 Morning routine: ${routineLine}
 
 INTAKE (what Vinny told you this morning):
@@ -52,9 +61,9 @@ CALENDAR TODAY:
 ${calendarLines(data.calendar)}
 
 ALL OPEN TASKS (priority pN, ★ = key, time blocks shown):
-${taskLines(data.openTasks)}
+${dueTodayLine ? `${dueTodayLine}\n` : ''}${taskLines(data.openTasks)}
 
-RECENT DEBRIEFS (continuity):
+RECENT DEBRIEFS (last 3, for continuity):
 ${historyLines(data.history)}
 
 ---
