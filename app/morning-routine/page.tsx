@@ -209,6 +209,81 @@ function ComparisonChip({ text }: { text: string }) {
   )
 }
 
+// ── Debrief message renderer ───────────────────────────────────
+
+const SECTION_HEADERS = [
+  'MORNING ROUTINE — DO THESE NOW',
+  "TODAY'S PLAN",
+  'BODY STATUS',
+  'SLEEP CHECK',
+  'CLOSING',
+]
+// Matches any of the known headers (with optional trailing colon)
+const SECTION_RE = new RegExp(
+  `^(${SECTION_HEADERS.map(h => h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')}):?`,
+  'm'
+)
+
+function DebriefMessage({ text, accentColor }: { text: string; accentColor: string }) {
+  // Split into [pre, header, body, header, body, ...]
+  const parts = text.split(SECTION_RE).filter(s => s.trim())
+
+  // Pair consecutive header + body chunks
+  const sections: { header: string; body: string }[] = []
+  let i = 0
+  while (i < parts.length) {
+    const trimmed = parts[i].trim()
+    if (SECTION_HEADERS.some(h => trimmed.startsWith(h))) {
+      sections.push({ header: trimmed.replace(/:$/, ''), body: (parts[i + 1] ?? '').trim() })
+      i += 2
+    } else {
+      // orphan text before first header — skip
+      i++
+    }
+  }
+
+  if (!sections.length) {
+    // fallback: plain text
+    return (
+      <div className="pl-3 py-0.5" style={{ borderLeft: `2px solid ${accentColor}` }}>
+        <p style={{ fontFamily: 'var(--font-sans)', fontSize: 12.5, color: 'var(--fg)', lineHeight: 1.55, opacity: 0.9 }}>
+          {text}
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-3" style={{ borderLeft: `2px solid ${accentColor}`, paddingLeft: 12 }}>
+      {sections.map(({ header, body }) => (
+        <div key={header} className="flex flex-col gap-0.5">
+          <span style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 8,
+            letterSpacing: '0.13em',
+            color: accentColor,
+            textTransform: 'uppercase',
+            opacity: 0.8,
+          }}>
+            {header}
+          </span>
+          <p style={{
+            fontFamily: 'var(--font-sans)',
+            fontSize: 12,
+            color: 'var(--fg)',
+            lineHeight: 1.6,
+            whiteSpace: 'pre-line',
+            opacity: 0.92,
+            margin: 0,
+          }}>
+            {body}
+          </p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Morning Debrief panel ──────────────────────────────────────
 
 function MorningDebrief() {
@@ -316,22 +391,7 @@ function MorningDebrief() {
 
           {/* AI Briefing */}
           {data?.debrief_message && (
-            <div
-              className="pl-3 py-0.5"
-              style={{
-                borderLeft: `2px solid ${data.whoop?.recovery_score != null ? recColor : 'var(--accent)'}`,
-              }}
-            >
-              <p style={{
-                fontFamily: 'var(--font-sans)',
-                fontSize: 12.5,
-                color: 'var(--fg)',
-                lineHeight: 1.55,
-                opacity: 0.9,
-              }}>
-                {data.debrief_message}
-              </p>
-            </div>
+            <DebriefMessage text={data.debrief_message} accentColor={data.whoop?.recovery_score != null ? recColor : 'var(--accent)'} />
           )}
 
           {/* Due Today */}

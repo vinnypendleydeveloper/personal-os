@@ -4,8 +4,20 @@ import { fetchWhoopData, getStoredTokens } from '@/lib/whoop'
 import { embedMemory } from '@/lib/embed'
 import Anthropic from '@anthropic-ai/sdk'
 import OpenAI from 'openai'
+import ICAL from 'ical.js'
+import { deriveTag } from '@/app/api/calendar/route'
 
 const TZ = process.env.USER_TIMEZONE || 'America/Los_Angeles'
+
+function stripMarkdown(text: string | null): string | null {
+  if (!text) return null
+  return text
+    .replace(/#{1,6}\s*/g, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .trim()
+}
 
 function todayKey() {
   return new Date().toLocaleDateString('en-CA', { timeZone: TZ })
@@ -169,41 +181,177 @@ export async function GET() {
     .order('priority_score', { ascending: false })
     .limit(8)
 
+  // ── 7b. Morning routine items ────────────────────────────
+  const ROUTINE_CONFIG_DATE = '2000-01-01'
+  const { data: configRow } = await db.from('daily_logs')
+    .select('notes').eq('user_id', USER_ID).eq('log_date', ROUTINE_CONFIG_DATE).maybeSingle()
+  const storedItems = configRow?.notes?.morning_routine_items
+  const routineItems: { id: string; label: string }[] = Array.isArray(storedItems) && storedItems.length
+    ? storedItems
+    : [
+        { id: 'wake', label: 'Wake up at 7:00 AM' },
+        { id: 'water', label: 'Drink a glass of water' },
+        { id: 'bed', label: 'Make my bed' },
+        { id: 'shower', label: 'Shower' },
+        { id: 'room', label: 'Clean my room' },
+        { id: 'shake', label: 'Make my shake' },
+        { id: 'supplements', label: 'Take supplements' },
+        { id: 'coffee', label: 'Make my coffee' },
+        { id: 'dressed', label: 'Get dressed' },
+        { id: 'gym', label: 'Go to the gym' },
+        { id: 'sauna', label: 'Sauna' },
+        { id: 'shower-post', label: 'Shower (post-gym)' },
+        { id: 'home', label: 'Come home' },
+      ]
+
+  // ── 7c. Today's calendar events ──────────────────────────
+  interface TodayEvent { title: string; start: string; end: string; allDay: boolean; location?: string; tag: string }
+  let todayEvents: TodayEvent[] = []
+  const icalUrl = process.env.GOOGLE_CALENDAR_ICAL_URL
+  if (icalUrl) {
+    try {
+      const res = await fetch(icalUrl, { cache: 'no-store' })
+      const text = await res.text()
+      const jcal = ICAL.parse(text)
+      const comp = new ICAL.Component(jcal)
+      const vevents = comp.getAllSubcomponents('vevent')
+      const todayStart = new Date(`${today}T00:00:00`)
+      const todayEnd = new Date(`${today}T23:59:59`)
+
+      for (const vevent of vevents) {
+        const event = new ICAL.Event(vevent)
+        const collect = (dt: Date, endDt: Date, isDate: boolean) => {
+          if (dt <= todayEnd && endDt >= todayStart) {
+            todayEvents.push({
+              title: event.summary,
+              start: dt.toISOString(),
+              end: endDt.toISOString(),
+              allDay: isDate,
+              location: event.location ?? undefined,
+              tag: deriveTag(event.summary, event.location ?? undefined),
+            })
+          }
+        }
+        if (event.isRecurring()) {
+          const iter = event.iterator()
+          let next = iter.next()
+          while (next) {
+            const dt = next.toJSDate()
+            if (dt > todayEnd) break
+            const dur = event.duration
+            collect(dt, new Date(dt.getTime() + dur.toSeconds() * 1000), event.startDate.isDate)
+            next = iter.next()
+          }
+        } else {
+          collect(event.startDate.toJSDate(), event.endDate.toJSDate(), event.startDate.isDate)
+        }
+      }
+      todayEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
+    } catch { /* non-fatal — debrief works without calendar */ }
+  }
+
   // ── 8. Generate AI debrief ───────────────────────────────
+  const routineSection = `MORNING ROUTINE — DO THESE NOW:\n${routineItems.map((item, i) => `${i + 1}. ${item.label}`).join('\n')}`
   let debriefMessage: string | null = null
   try {
     const wakeStr = debrief.wake_time
       ? new Date(debrief.wake_time as string).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: TZ })
       : 'unknown'
 
-    const prompt = [
-      'You are a personal morning debrief assistant. Write exactly 2-3 sentences as a focused daily briefing — specific, direct, energizing. Reference real numbers.',
-      `Wake: ${wakeStr}. Sleep: ${todaySleep != null ? `${todaySleep}h` : 'unknown'}. HRV: ${todayHrv != null ? `${todayHrv}ms` : 'unknown'}. Recovery: ${todayRecovery != null ? `${todayRecovery}%` : 'unknown'}. Sleep performance: ${whoopData?.sleep_performance != null ? `${whoopData.sleep_performance}%` : 'unknown'}.`,
-      comparisons.length ? `Observations: ${comparisons.join('; ')}.` : '',
-      dueTasks?.length ? `Tasks due today: ${dueTasks.slice(0, 4).map(t => t.title).join(', ')}.` : 'No tasks due today.',
-      'Avoid clichés. Be terse and grounded.',
-    ].filter(Boolean).join(' ')
+    const fmt = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: TZ })
 
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-    const msg = await anthropic.messages.create({
-      model: process.env.ANTHROPIC_MODEL ?? 'claude-haiku-4-5-20251001',
-      max_tokens: 200,
-      messages: [{ role: 'user', content: prompt }],
-    })
-    debriefMessage = msg.content[0]?.type === 'text' ? msg.content[0].text.trim() : null
-  } catch {
-    try {
-      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-      const wakeStr = debrief.wake_time
-        ? new Date(debrief.wake_time as string).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: TZ })
-        : 'unknown'
-      const r = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        max_tokens: 200,
-        messages: [{ role: 'user', content: `Morning debrief (2-3 sentences, specific): Wake ${wakeStr}. Sleep ${todaySleep}h. HRV ${todayHrv}ms. Recovery ${todayRecovery}%. ${comparisons.join('; ')}. Tasks: ${dueTasks?.map(t => t.title).join(', ')}. Be direct.` }],
+    const calendarLines = todayEvents.length
+      ? todayEvents.map(e => {
+          if (e.allDay) return `• All day: ${e.title}`
+          return `• ${fmt(new Date(e.start))}–${fmt(new Date(e.end))}: ${e.title}${e.location ? ` @ ${e.location}` : ''} [${e.tag}]`
+        }).join('\n')
+      : 'No events scheduled.'
+
+    const taskLines = dueTasks?.length
+      ? dueTasks.map(t => `• ${t.title} [${t.urgency}]`).join('\n')
+      : 'No tasks due today.'
+
+    const sleepVsYesterday = todaySleep != null && ySleep != null
+      ? `${Math.abs(Math.round((todaySleep - ySleep) * 60))} min ${todaySleep >= ySleep ? 'more' : 'less'} than yesterday (${ySleep.toFixed(1)}h)`
+      : null
+    const sleepVsAvg = todaySleep != null && avg7dSleep != null
+      ? `${Math.abs(Math.round((todaySleep - avg7dSleep) * 60))} min ${todaySleep >= avg7dSleep ? 'more' : 'less'} than 7-day avg (${avg7dSleep.toFixed(1)}h)`
+      : null
+
+    const recoveryBand = todayRecovery == null ? 'unknown'
+      : todayRecovery >= 66 ? `${todayRecovery}% — GREEN, push hard`
+      : todayRecovery >= 33 ? `${todayRecovery}% — YELLOW, moderate effort`
+      : `${todayRecovery}% — RED, take it easy today`
+
+    const systemPrompt = `You are Vinny's personal morning coach. Rules you must follow:
+1. Plain text only — zero markdown, no #, no **, no *.
+2. Assertive and direct. No filler phrases, no "great job", no "you got this", no generic motivation.
+3. Only use data explicitly provided. Never invent tasks, events, meetings, or numbers.
+4. Your response must start with the exact text "TODAY'S PLAN:" — no preamble, no other sections before it.`
+
+    const userPrompt = `Write a morning debrief for Vinny using the data below. Output exactly 4 sections in this order, starting immediately with "TODAY'S PLAN:" — do not write anything before it.
+
+BIOMETRICS:
+Wake time: ${wakeStr}
+Recovery: ${recoveryBand}
+HRV: ${todayHrv != null ? `${todayHrv}ms` : 'unknown'} (7-day avg: ${avg7dHrv != null ? `${Math.round(avg7dHrv)}ms` : 'unknown'})
+Sleep last night: ${todaySleep != null ? `${todaySleep}h` : 'unknown'}${sleepVsYesterday ? ` (${sleepVsYesterday})` : ''}${sleepVsAvg ? `, ${sleepVsAvg}` : ''}
+Sleep score: ${whoopData?.sleep_performance != null ? `${whoopData.sleep_performance}%` : 'unknown'}
+RHR: ${whoopData?.rhr != null ? `${whoopData.rhr}bpm` : 'unknown'}
+
+CALENDAR TODAY:
+${calendarLines}
+
+TASKS DUE TODAY:
+${taskLines}
+
+---
+
+TODAY'S PLAN:
+Use exact event times from the calendar. Weave in due tasks. Specific — what to do and when. If no events or tasks, say "No events or tasks today. Use the time to get ahead on something." Don't leave this section empty.
+
+BODY STATUS:
+2-3 assertive sentences using the actual numbers. Green recovery = push hard. Yellow = moderate pace. Red = back off. HRV above avg = primed. HRV below avg = stressed.
+
+SLEEP CHECK:
+State last night's hours, compare to yesterday and 7-day avg with exact minute numbers. If behind on sleep, last sentence must be: "Fix that tonight."
+
+CLOSING:
+Exactly one sentence. Tied to what's actually on his plate today. No generic lines.`
+
+    // Try Anthropic first (if key is configured), fall through to OpenAI otherwise
+    if (process.env.ANTHROPIC_API_KEY) {
+      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+      const msg = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 900,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
       })
-      debriefMessage = r.choices[0]?.message?.content?.trim() ?? null
-    } catch { /* non-fatal */ }
+      const raw = msg.content[0]?.type === 'text' ? msg.content[0].text.trim() : null
+      let aiSections = stripMarkdown(raw) ?? ''
+      const planIdx = aiSections.indexOf("TODAY'S PLAN")
+      if (planIdx > 0) aiSections = aiSections.slice(planIdx)
+      debriefMessage = aiSections ? `${routineSection}\n\n${aiSections}` : routineSection
+    } else {
+      // OpenAI primary path (no Anthropic key configured)
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+      const r = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        max_tokens: 900,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+      })
+      let aiSections = stripMarkdown(r.choices[0]?.message?.content?.trim() ?? null) ?? ''
+      const planIdx = aiSections.indexOf("TODAY'S PLAN")
+      if (planIdx > 0) aiSections = aiSections.slice(planIdx)
+      debriefMessage = aiSections ? `${routineSection}\n\n${aiSections}` : routineSection
+    }
+  } catch (err) {
+    console.error('[debrief] AI generation failed:', err)
+    debriefMessage = routineSection
   }
 
   // ── 9. Embed into brain memory (once per day) ────────────
