@@ -3,9 +3,17 @@ import { getServiceClient, USER_ID } from '@/lib/supabase'
 import { WHO_I_AM } from '@/lib/personalContext'
 import { complete } from '@/lib/ai'
 import {
-  gatherDebriefData, recoveryBand, calendarLines, taskLines, historyLines,
-  saveDebriefHistory, fmtTime, todayKey, type DebriefData,
+  gatherDebriefData, recoveryBand, calendarLines,
+  saveDebriefHistory, fmtTime, todayKey, type DebriefData, type DebriefTask,
 } from '@/lib/debriefData'
+
+function planTaskLines(tasks: DebriefTask[]): string {
+  if (!tasks.length) return 'None'
+  return tasks.map(t => {
+    const tags = t.tags.filter(x => !x.startsWith('@')).join(' ')
+    return `• ${t.title} [${t.urgency}, p${t.priority_score}]${t.due_date ? ` due ${t.due_date}` : ''}${tags ? ` ${tags}` : ''}`
+  }).join('\n')
+}
 
 interface DashboardIntake {
   wake_time?: string // "7:10 AM" or freeform
@@ -35,9 +43,12 @@ You are writing Vinny's in-depth daily briefing — the full version, like a sha
 - Tight and high-signal — roughly 200 words. No filler, no generic motivation.`
 
   const trendLine = data.comparisons.length ? `Trends: ${data.comparisons.join('; ')}` : ''
-  const dueTodayLine = data.dueTasks.length
-    ? `DUE TODAY: ${data.dueTasks.map(t => t.title).join(', ')}`
-    : ''
+
+  const today = data.today
+  const overdueTasks = data.openTasks.filter(t => t.due_date && t.due_date < today)
+  const dueTodayTasks = data.openTasks.filter(t => t.due_date === today)
+  const dueDateIds = new Set([...overdueTasks, ...dueTodayTasks].map(t => t.id))
+  const topPriorityTasks = data.openTasks.filter(t => !dueDateIds.has(t.id)).slice(0, 5)
 
   const user = `Build today's full briefing. Current time: ${fmtTime(now)}.
 
@@ -60,11 +71,26 @@ Blocks to protect: ${intake.protect || 'none'}
 CALENDAR TODAY:
 ${calendarLines(data.calendar)}
 
-ALL OPEN TASKS (priority pN, ★ = key, time blocks shown):
-${dueTodayLine ? `${dueTodayLine}\n` : ''}${taskLines(data.openTasks)}
+TASKS (priority pN, ★ = key, time blocks shown):
+OVERDUE:
+${planTaskLines(overdueTasks) || 'None'}
+
+DUE TODAY:
+${planTaskLines(dueTodayTasks) || 'None'}
+
+TOP PRIORITY (up to 5, not in above groups):
+${planTaskLines(topPriorityTasks) || 'None'}
 
 RECENT DEBRIEFS (last 3, for continuity):
-${historyLines(data.history)}
+${data.history.length
+  ? data.history.map(h => {
+      const i = h.intake as Record<string, string>
+      const energy = i.energy || 'unknown'
+      const must_do = i.must_do || 'not given'
+      const protect = i.protect || 'none'
+      return `On ${h.log_date}, energy was ${energy}, must-do was '${must_do}', protected '${protect}'.`
+    }).join('\n')
+  : '(no recent debriefs)'}
 
 ---
 Write the briefing now in this markdown structure:
