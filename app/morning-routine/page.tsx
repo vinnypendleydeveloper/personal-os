@@ -773,6 +773,112 @@ function WeightInput({ onSaved }: { onSaved: (logged: boolean) => void }) {
   )
 }
 
+// ── Weekly Section (Mondays only) ─────────────────────────────
+
+const WEEKLY_DEFAULTS = ['Charge Loop', 'Charge Speaker', 'Charge AirPods', 'Charge AirPods Max']
+
+function WeeklySection() {
+  const [checked, setChecked] = useState<Record<string, boolean>>({})
+  const [custom, setCustom] = useState<{ id: string; label: string }[]>([])
+  const [newLabel, setNewLabel] = useState('')
+
+  const isMonday = new Date().getDay() === 1
+  if (!isMonday) return null
+
+  function toggle(id: string) {
+    setChecked(prev => ({ ...prev, [id]: !prev[id] }))
+  }
+
+  function addCustom() {
+    const label = newLabel.trim()
+    if (!label) return
+    setCustom(prev => [...prev, { id: crypto.randomUUID(), label }])
+    setNewLabel('')
+  }
+
+  function deleteCustom(id: string) {
+    setCustom(prev => prev.filter(i => i.id !== id))
+  }
+
+  const allItems = [
+    ...WEEKLY_DEFAULTS.map((label, i) => ({ id: `weekly-default-${i}`, label, isDefault: true })),
+    ...custom.map(i => ({ ...i, isDefault: false })),
+  ]
+
+  return (
+    <Panel index={4} title="Weekly">
+      <div className="flex flex-col gap-1 mt-1">
+        {allItems.map(item => {
+          const done = !!checked[item.id]
+          return (
+            <div
+              key={item.id}
+              className="group flex items-center gap-2.5 rounded-lg px-2 py-2 transition-all"
+            >
+              <button
+                onClick={() => toggle(item.id)}
+                className="w-5 h-5 rounded shrink-0 border flex items-center justify-center transition-all duration-200"
+                style={{
+                  background: done ? 'var(--ok)' : 'transparent',
+                  borderColor: done ? 'var(--ok)' : 'var(--bg-3)',
+                  boxShadow: done ? '0 0 6px var(--ok-dim)' : 'none',
+                }}
+              >
+                {done && (
+                  <svg width="10" height="8" viewBox="0 0 8 6" fill="none">
+                    <path d="M1 3L3 5L7 1" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </button>
+              <span
+                className="flex-1 text-sm transition-all duration-200 min-w-0"
+                style={{
+                  color: done ? 'var(--fg-2)' : 'var(--fg)',
+                  textDecoration: done ? 'line-through' : 'none',
+                  textDecorationColor: 'var(--fg-2)',
+                }}
+              >
+                {item.label}
+              </span>
+              {!item.isDefault && (
+                <button
+                  onClick={() => deleteCustom(item.id)}
+                  className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--hot)' }}
+                  title="Delete item"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          )
+        })}
+
+        {/* Add one-off item */}
+        <div className="flex items-center gap-2 mt-2 pt-2" style={{ borderTop: '1px solid var(--border)' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent)', marginLeft: 6 }}>+</span>
+          <input
+            value={newLabel}
+            onChange={e => setNewLabel(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addCustom()}
+            placeholder="Add a one-off task…"
+            className="flex-1 text-sm px-2 py-1.5 rounded-lg outline-none"
+            style={{ background: 'var(--bg-2)', border: '1px solid var(--border)', color: 'var(--fg)' }}
+          />
+          <button
+            onClick={addCustom}
+            disabled={!newLabel.trim()}
+            className="text-xs px-3 py-1.5 rounded-lg font-semibold disabled:opacity-30 hover:brightness-110"
+            style={{ fontFamily: 'var(--font-mono)', background: 'var(--accent)', color: 'oklch(0.09 0.008 255)' }}
+          >
+            ADD
+          </button>
+        </div>
+      </div>
+    </Panel>
+  )
+}
+
 // ── Main page ──────────────────────────────────────────────────
 
 interface Item { id: string; label: string }
@@ -1018,6 +1124,8 @@ export default function MorningRoutinePage() {
             </div>
           )}
         </Panel>
+
+        <WeeklySection />
 
         <p className="text-[10px] text-center" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)' }}>
           Drag ⠿ to reorder · click a step to rename · completions reset at midnight
