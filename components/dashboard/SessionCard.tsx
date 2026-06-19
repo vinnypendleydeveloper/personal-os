@@ -6,9 +6,10 @@ import { Markdown } from '@/components/Markdown'
 
 interface Msg { role: 'user' | 'assistant'; content: string }
 interface Defaults { wake_time: string | null; recovery: number | null }
-interface Intake { wake_time?: string; energy?: string; must_do?: string; protect?: string }
+interface Intake { wake_time?: string; energy?: string; must_do?: string; protect?: string; confirmed_today?: string[] }
 interface BriefingTask {
   id: string; title: string; urgency: string; priority_score: number; due_date: string | null
+  description: string | null; tags: string[]
 }
 
 function briefingToday() { return new Date().toLocaleDateString('en-CA') }
@@ -45,6 +46,7 @@ export function SessionCard() {
   const [energy, setEnergy] = useState('')
   const [mustDo, setMustDo] = useState('')
   const [protect, setProtect] = useState('')
+  const [confirmedToday, setConfirmedToday] = useState<string[]>([])
 
   useEffect(() => {
     fetch('/api/plan')
@@ -58,6 +60,7 @@ export function SessionCard() {
           setEnergy(intake.energy ?? '')
           setMustDo(intake.must_do ?? '')
           setProtect(intake.protect ?? '')
+          if (intake.confirmed_today) setConfirmedToday(intake.confirmed_today)
         } else if (d.defaults?.wake_time) {
           setWake(d.defaults.wake_time)
         }
@@ -120,7 +123,7 @@ export function SessionCard() {
     try {
       const r = await fetch('/api/plan', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ wake_time: wake, energy, must_do: mustDo, protect }),
+        body: JSON.stringify({ wake_time: wake, energy, must_do: mustDo, protect, confirmed_today: confirmedToday }),
       })
       const d = await r.json()
       setPlan(d.plan ?? '')
@@ -169,6 +172,9 @@ export function SessionCard() {
             generating={generating}
             onGenerate={generate}
             onCancel={plan ? () => setFormOpen(false) : undefined}
+            tasks={tasks}
+            confirmedToday={confirmedToday}
+            setConfirmedToday={setConfirmedToday}
           />
         ) : plan ? (
           <>
@@ -213,6 +219,7 @@ export function SessionCard() {
 function IntakeForm({
   wake, setWake, energy, setEnergy, mustDo, setMustDo, protect, setProtect,
   recovery, generating, onGenerate, onCancel,
+  tasks, confirmedToday, setConfirmedToday,
 }: {
   wake: string; setWake: (v: string) => void
   energy: string; setEnergy: (v: string) => void
@@ -222,6 +229,9 @@ function IntakeForm({
   generating: boolean
   onGenerate: () => void
   onCancel?: () => void
+  tasks: BriefingTask[]
+  confirmedToday: string[]
+  setConfirmedToday: (v: string[]) => void
 }) {
   const field = {
     background: 'var(--bg-2)', border: '1px solid var(--border)', color: 'var(--fg)',
@@ -263,6 +273,53 @@ function IntakeForm({
           ))}
         </div>
       </div>
+
+      {/* Committed tasks checklist */}
+      {tasks.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <label style={labelStyle}>Which of these do you need to get done today — guaranteed?</label>
+          {tasks.map(t => {
+            const checked = confirmedToday.includes(t.id)
+            const overdue = !!(t.due_date && t.due_date < briefingToday())
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setConfirmedToday(
+                  checked ? confirmedToday.filter(id => id !== t.id) : [...confirmedToday, t.id]
+                )}
+                className="flex items-center gap-2 text-left rounded-md transition-all"
+                style={{
+                  padding: '6px 10px',
+                  background: checked ? 'var(--accent-dim)' : 'var(--bg-2)',
+                  border: `1px solid ${checked ? 'var(--accent-glow)' : 'var(--border)'}`,
+                }}
+              >
+                <span style={{
+                  width: 12, height: 12, borderRadius: 3, flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  border: `1px solid ${checked ? 'var(--accent)' : 'var(--border)'}`,
+                  background: checked ? 'var(--accent)' : 'transparent',
+                  color: 'oklch(0.09 0.008 255)', fontSize: 9, lineHeight: 1,
+                }}>
+                  {checked ? '✓' : ''}
+                </span>
+                <span className="flex-1 text-xs leading-snug" style={{ color: checked ? 'var(--accent)' : 'var(--fg)' }}>
+                  {t.title}
+                </span>
+                {t.due_date && (
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.06em', flexShrink: 0,
+                    color: overdue ? 'oklch(0.65 0.22 20)' : 'var(--fg-3)',
+                  }}>
+                    {overdue ? 'OVERDUE' : 'TODAY'}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* Must do */}
       <div className="flex flex-col gap-1">

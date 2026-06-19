@@ -11,15 +11,17 @@ function planTaskLines(tasks: DebriefTask[]): string {
   if (!tasks.length) return 'None'
   return tasks.map(t => {
     const tags = t.tags.filter(x => !x.startsWith('@')).join(' ')
-    return `• ${t.title} [${t.urgency}, p${t.priority_score}]${t.due_date ? ` due ${t.due_date}` : ''}${tags ? ` ${tags}` : ''}`
+    const desc = t.description ? `\n  → ${t.description}` : ''
+    return `• ${t.title} [${t.urgency}, p${t.priority_score}]${t.due_date ? ` due ${t.due_date}` : ''}${tags ? ` ${tags}` : ''}${desc}`
   }).join('\n')
 }
 
 interface DashboardIntake {
-  wake_time?: string // "7:10 AM" or freeform
-  energy?: string    // low | medium | high
-  must_do?: string   // #1 must-get-done
-  protect?: string   // free blocks to protect
+  wake_time?: string      // "7:10 AM" or freeform
+  energy?: string         // low | medium | high
+  must_do?: string        // #1 must-get-done
+  protect?: string        // free blocks to protect
+  confirmed_today?: string[] // task IDs Vinny committed to in the check-in
 }
 
 function buildFullPlanPrompt(data: DebriefData, intake: DashboardIntake) {
@@ -40,7 +42,8 @@ You are writing Vinny's in-depth daily briefing — the full version, like a sha
 - Respect recovery: green = push hard, yellow = moderate, red = protect recovery and keep training light.
 - Honor any blocks he asked to protect.
 - Reference recent debriefs for continuity only when genuinely relevant.
-- Tight and high-signal — roughly 200 words. No filler, no generic motivation.`
+- Tight and high-signal — roughly 200 words. No filler, no generic motivation.
+- For the CRM Tasks section: read each task's title AND description before writing. If any task description has unclear context, surface a clarifying question inline: "For [task name] — do you mean X or Y?" Output a bullet list of ALL open CRM tasks (overdue + due today + high priority) sorted by what should be done first; each bullet gets one-line rationale. Bold the top 1–2 non-negotiable tasks. End the section with exactly: "Which of these are you committing to today?"`
 
   const trendLine = data.comparisons.length ? `Trends: ${data.comparisons.join('; ')}` : ''
 
@@ -49,6 +52,12 @@ You are writing Vinny's in-depth daily briefing — the full version, like a sha
   const dueTodayTasks = data.openTasks.filter(t => t.due_date === today)
   const dueDateIds = new Set([...overdueTasks, ...dueTodayTasks].map(t => t.id))
   const topPriorityTasks = data.openTasks.filter(t => !dueDateIds.has(t.id)).slice(0, 5)
+
+  const confirmedLines = (intake.confirmed_today ?? [])
+    .map(id => data.openTasks.find(t => t.id === id)?.title)
+    .filter((title): title is string => !!title)
+    .map(title => `• ${title}`)
+    .join('\n')
 
   const user = `Build today's full briefing. Current time: ${fmtTime(now)}.
 
@@ -80,7 +89,7 @@ ${planTaskLines(dueTodayTasks) || 'None'}
 
 TOP PRIORITY (up to 5, not in above groups):
 ${planTaskLines(topPriorityTasks) || 'None'}
-
+${confirmedLines ? `\nCONFIRMED TODAY (tasks Vinny explicitly committed to in his check-in):\n${confirmedLines}` : ''}
 RECENT DEBRIEFS (last 3, for continuity):
 ${data.history.length
   ? data.history.map(h => {
@@ -101,14 +110,17 @@ Write the briefing now in this markdown structure:
 A time-blocked schedule as a list, starting from now. Each line: \`time range — what — (why, short phrase)\`. Anchor on real events and task time blocks; slot his #1 and key tasks into open windows; protect the blocks he named.
 
 ## One Thing
-The single most important task today and why it moves a summer goal.`
+The single most important task today and why it moves a summer goal.
+
+## CRM Tasks
+Bullet list of ALL open tasks (overdue + due today + high priority) sorted by what should be done first. Each bullet: task name — one-line rationale. Bold the top 1–2 non-negotiable tasks. If any description context is unclear, surface a clarifying question here. End with: "Which of these are you committing to today?"`
 
   return { system, user }
 }
 
 async function generateFullPlan(data: DebriefData, intake: DashboardIntake): Promise<string> {
   const { system, user } = buildFullPlanPrompt(data, intake)
-  return complete({ system, messages: user, maxTokens: 900 })
+  return complete({ system, messages: user, maxTokens: 1200 })
 }
 
 async function readToday() {
@@ -167,6 +179,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const intake: DashboardIntake = {
     wake_time: body.wake_time, energy: body.energy, must_do: body.must_do, protect: body.protect,
+    confirmed_today: Array.isArray(body.confirmed_today) ? body.confirmed_today : undefined,
   }
   const data = await gatherDebriefData()
   const plan = await generateFullPlan(data, intake)

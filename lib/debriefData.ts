@@ -45,6 +45,7 @@ export interface TodayEvent {
 export interface DebriefTask {
   id: string
   title: string
+  description: string | null
   urgency: string
   priority_score: number
   tags: string[]
@@ -276,21 +277,21 @@ export async function gatherDebriefData(opts: { logWake?: boolean } = {}): Promi
   let openRows: Record<string, unknown>[] | null = null
   {
     const rich = await db.from('tasks')
-      .select('id, title, urgency, priority_score, tags, due_date, start_time, duration_min, recurring, key')
+      .select('id, title, description, urgency, priority_score, tags, due_date, start_time, duration_min, recurring, key')
       .eq('user_id', USER_ID).is('completed_at', null)
       .order('priority_score', { ascending: false })
     openRows = (rich.data as Record<string, unknown>[] | null)
     if (!openRows) {
       const base = await db.from('tasks')
-        .select('id, title, urgency, priority_score, tags, due_date, key')
+        .select('id, title, description, urgency, priority_score, tags, due_date, key')
         .eq('user_id', USER_ID).is('completed_at', null)
         .order('priority_score', { ascending: false })
       openRows = (base.data as Record<string, unknown>[] | null)
     }
   }
   const openTasks: DebriefTask[] = (openRows ?? []).map(t => ({
-    id: t.id as string, title: t.title as string, urgency: t.urgency as string,
-    priority_score: (t.priority_score as number) ?? 0,
+    id: t.id as string, title: t.title as string, description: (t.description as string) ?? null,
+    urgency: t.urgency as string, priority_score: (t.priority_score as number) ?? 0,
     tags: (t.tags as string[]) ?? [], due_date: (t.due_date as string) ?? null,
     start_time: (t.start_time as string) ?? null, duration_min: (t.duration_min as number) ?? null,
     recurring: !!t.recurring, key: !!t.key,
