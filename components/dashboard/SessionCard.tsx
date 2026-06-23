@@ -6,7 +6,17 @@ import { Markdown } from '@/components/Markdown'
 
 interface Msg { role: 'user' | 'assistant'; content: string }
 interface Defaults { wake_time: string | null; recovery: number | null }
-interface Intake { wake_time?: string; energy?: string; must_do?: string; protect?: string }
+interface Intake { wake_time?: string; energy?: string; must_do?: string; protect?: string; confirmed_today?: string[] }
+interface BriefingTask {
+  id: string; title: string; urgency: string; priority_score: number; due_date: string | null
+  description: string | null; tags: string[]
+}
+
+function briefingToday() { return new Date().toLocaleDateString('en-CA') }
+function fmtDue(s: string) {
+  const [, m, d] = s.split('-').map(Number)
+  return `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m - 1]} ${d}`
+}
 
 function greeting() {
   const h = new Date().getHours()
@@ -36,6 +46,7 @@ export function SessionCard() {
   const [energy, setEnergy] = useState('')
   const [mustDo, setMustDo] = useState('')
   const [protect, setProtect] = useState('')
+  const [confirmedToday, setConfirmedToday] = useState<string[]>([])
 
   useEffect(() => {
     fetch('/api/plan')
@@ -49,6 +60,7 @@ export function SessionCard() {
           setEnergy(intake.energy ?? '')
           setMustDo(intake.must_do ?? '')
           setProtect(intake.protect ?? '')
+          if (intake.confirmed_today) setConfirmedToday(intake.confirmed_today)
         } else if (d.defaults?.wake_time) {
           setWake(d.defaults.wake_time)
         }
@@ -58,12 +70,60 @@ export function SessionCard() {
       .catch(() => setPlanLoading(false))
   }, [])
 
+  const [tasks, setTasks] = useState<BriefingTask[]>([])
+
+  useEffect(() => {
+    fetch('/api/tasks?status=open')
+      .then(r => r.json())
+      .then(d => {
+        const today = briefingToday()
+        const relevant = ((d.tasks ?? []) as BriefingTask[])
+          .filter(t => t.due_date && t.due_date <= today)
+          .sort((a, b) => b.priority_score - a.priority_score)
+        setTasks(relevant)
+      })
+      .catch(() => {})
+  }, [])
+
+  async function completeTask(id: string) {
+    setTasks(prev => prev.filter(t => t.id !== id))
+    await fetch(`/api/tasks/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ completed_at: new Date().toISOString() }),
+    })
+  }
+
+  async function reorderTask(id: string, dir: 'up' | 'down') {
+    const idx = tasks.findIndex(t => t.id === id)
+    const swapIdx = dir === 'up' ? idx - 1 : idx + 1
+    if (idx < 0 || swapIdx < 0 || swapIdx >= tasks.length) return
+    const a = tasks[idx]
+    const b = tasks[swapIdx]
+    setTasks(prev =>
+      prev.map((t, i) => {
+        if (i === idx) return { ...t, priority_score: b.priority_score }
+        if (i === swapIdx) return { ...t, priority_score: a.priority_score }
+        return t
+      }).sort((x, y) => y.priority_score - x.priority_score)
+    )
+    await Promise.all([
+      fetch(`/api/tasks/${a.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priority_score: b.priority_score }),
+      }),
+      fetch(`/api/tasks/${b.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priority_score: a.priority_score }),
+      }),
+    ])
+  }
+
   async function generate() {
     setGenerating(true)
     try {
       const r = await fetch('/api/plan', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ wake_time: wake, energy, must_do: mustDo, protect }),
+        body: JSON.stringify({ wake_time: wake, energy, must_do: mustDo, protect, confirmed_today: confirmedToday }),
       })
       const d = await r.json()
       setPlan(d.plan ?? '')
@@ -112,11 +172,19 @@ export function SessionCard() {
             generating={generating}
             onGenerate={generate}
             onCancel={plan ? () => setFormOpen(false) : undefined}
+            tasks={tasks}
+            confirmedToday={confirmedToday}
+            setConfirmedToday={setConfirmedToday}
           />
         ) : plan ? (
-          <div style={{ fontSize: 13 }}>
-            <Markdown text={plan} />
-          </div>
+          <>
+            <div style={{ fontSize: 13 }}>
+              <Markdown text={plan} />
+            </div>
+            {tasks.length > 0 && (
+              <BriefingTaskList tasks={tasks} onComplete={completeTask} onReorder={reorderTask} />
+            )}
+          </>
         ) : (
           <button
             onClick={() => setFormOpen(true)}
@@ -151,6 +219,7 @@ export function SessionCard() {
 function IntakeForm({
   wake, setWake, energy, setEnergy, mustDo, setMustDo, protect, setProtect,
   recovery, generating, onGenerate, onCancel,
+  tasks, confirmedToday, setConfirmedToday,
 }: {
   wake: string; setWake: (v: string) => void
   energy: string; setEnergy: (v: string) => void
@@ -160,6 +229,9 @@ function IntakeForm({
   generating: boolean
   onGenerate: () => void
   onCancel?: () => void
+  tasks: BriefingTask[]
+  confirmedToday: string[]
+  setConfirmedToday: (v: string[]) => void
 }) {
   const field = {
     background: 'var(--bg-2)', border: '1px solid var(--border)', color: 'var(--fg)',
@@ -202,6 +274,53 @@ function IntakeForm({
         </div>
       </div>
 
+      {/* Committed tasks checklist */}
+      {tasks.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <label style={labelStyle}>Which of these do you need to get done today — guaranteed?</label>
+          {tasks.map(t => {
+            const checked = confirmedToday.includes(t.id)
+            const overdue = !!(t.due_date && t.due_date < briefingToday())
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setConfirmedToday(
+                  checked ? confirmedToday.filter(id => id !== t.id) : [...confirmedToday, t.id]
+                )}
+                className="flex items-center gap-2 text-left rounded-md transition-all"
+                style={{
+                  padding: '6px 10px',
+                  background: checked ? 'var(--accent-dim)' : 'var(--bg-2)',
+                  border: `1px solid ${checked ? 'var(--accent-glow)' : 'var(--border)'}`,
+                }}
+              >
+                <span style={{
+                  width: 12, height: 12, borderRadius: 3, flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  border: `1px solid ${checked ? 'var(--accent)' : 'var(--border)'}`,
+                  background: checked ? 'var(--accent)' : 'transparent',
+                  color: 'oklch(0.09 0.008 255)', fontSize: 9, lineHeight: 1,
+                }}>
+                  {checked ? '✓' : ''}
+                </span>
+                <span className="flex-1 text-xs leading-snug" style={{ color: checked ? 'var(--accent)' : 'var(--fg)' }}>
+                  {t.title}
+                </span>
+                {t.due_date && (
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.06em', flexShrink: 0,
+                    color: overdue ? 'oklch(0.65 0.22 20)' : 'var(--fg-3)',
+                  }}>
+                    {overdue ? 'OVERDUE' : 'TODAY'}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {/* Must do */}
       <div className="flex flex-col gap-1">
         <label style={labelStyle}>#1 must-get-done today</label>
@@ -225,6 +344,80 @@ function IntakeForm({
         style={{ fontFamily: 'var(--font-mono)', background: 'var(--accent)', color: 'oklch(0.09 0.008 255)' }}>
         {generating ? 'BUILDING YOUR DAY…' : 'GENERATE BRIEFING'}
       </button>
+    </div>
+  )
+}
+
+// ── Briefing task list ────────────────────────────────────────────────────────
+function BriefingTaskRow({ t, idx, total, today, onComplete, onReorder }: {
+  t: BriefingTask; idx: number; total: number; today: string
+  onComplete: (id: string) => void
+  onReorder: (id: string, dir: 'up' | 'down') => void
+}) {
+  const isOverdue = !!(t.due_date && t.due_date < today)
+  const accent = isOverdue ? 'oklch(0.65 0.22 20)' : 'var(--fg-3)'
+  return (
+    <div className="flex items-center gap-2 group">
+      <button
+        onClick={() => onComplete(t.id)}
+        title="Mark complete"
+        className="shrink-0 flex items-center justify-center transition-colors hover:border-[var(--ok)]"
+        style={{ width: 13, height: 13, borderRadius: 3, border: '1px solid var(--border)', flexShrink: 0 }}
+      />
+      <span className="flex-1 text-xs leading-snug" style={{ color: 'var(--fg)' }}>{t.title}</span>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.06em', color: accent, flexShrink: 0 }}>
+        {t.urgency.replace(/_/g, ' ').toUpperCase()}
+      </span>
+      {t.due_date && (
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: accent, flexShrink: 0 }}>
+          {isOverdue ? `OVERDUE ${fmtDue(t.due_date)}` : fmtDue(t.due_date)}
+        </span>
+      )}
+      <div className="flex flex-col shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{ gap: 1 }}>
+        <button onClick={() => onReorder(t.id, 'up')} disabled={idx === 0}
+          className="text-[8px] leading-none disabled:opacity-20 hover:text-[var(--accent)] transition-colors"
+          style={{ color: 'var(--fg-3)' }}>▲</button>
+        <button onClick={() => onReorder(t.id, 'down')} disabled={idx === total - 1}
+          className="text-[8px] leading-none disabled:opacity-20 hover:text-[var(--accent)] transition-colors"
+          style={{ color: 'var(--fg-3)' }}>▼</button>
+      </div>
+    </div>
+  )
+}
+
+function BriefingTaskList({ tasks, onComplete, onReorder }: {
+  tasks: BriefingTask[]
+  onComplete: (id: string) => void
+  onReorder: (id: string, dir: 'up' | 'down') => void
+}) {
+  const today = briefingToday()
+  const overdue = tasks.filter(t => t.due_date && t.due_date < today)
+  const dueToday = tasks.filter(t => t.due_date === today)
+  const label = { fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.10em', textTransform: 'uppercase' as const }
+
+  return (
+    <div className="flex flex-col gap-2 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+      <span style={{ ...label, color: 'var(--fg-3)' }}>Tasks Due</span>
+
+      {overdue.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <span style={{ ...label, color: 'oklch(0.65 0.22 20)' }}>Overdue</span>
+          {overdue.map(t => (
+            <BriefingTaskRow key={t.id} t={t} idx={tasks.indexOf(t)} total={tasks.length}
+              today={today} onComplete={onComplete} onReorder={onReorder} />
+          ))}
+        </div>
+      )}
+
+      {dueToday.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          {overdue.length > 0 && <span style={{ ...label, color: 'var(--accent)' }}>Due Today</span>}
+          {dueToday.map(t => (
+            <BriefingTaskRow key={t.id} t={t} idx={tasks.indexOf(t)} total={tasks.length}
+              today={today} onComplete={onComplete} onReorder={onReorder} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -7,6 +7,12 @@
       "runtimeArgs": ["run", "dev"],
       "port": 3000,
       "autoPort": false
+    },
+    {
+      "name": "ycf-website",
+      "runtimeExecutable": "/opt/homebrew/bin/python3",
+      "runtimeArgs": ["-m", "http.server", "4321", "--directory", "/Users/vinnypendley/Desktop/ycf-website"],
+      "port": 4321
     }
   ]
 }
