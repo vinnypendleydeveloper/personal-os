@@ -220,7 +220,7 @@ function FeatureCard({
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
 
           {/* Title row */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="flex items-start flex-wrap gap-2">
             <span
               style={{
                 fontFamily: 'var(--font-sans)',
@@ -229,7 +229,7 @@ function FeatureCard({
                 color: 'var(--fg)',
                 lineHeight: 1.4,
                 flex: 1,
-                minWidth: 0,
+                minWidth: 120,
               }}
             >
               {feature.title}
@@ -689,7 +689,7 @@ export default function NewFeaturesPage() {
                     opacity: (!!suggestion || suggesting) ? 0.5 : 1,
                   }}
                 />
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     value={whenToAdd}
                     onChange={e => setWhenToAdd(e.target.value)}

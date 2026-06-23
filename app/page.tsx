@@ -15,7 +15,7 @@ import { CaptureBox } from '@/components/dashboard/CaptureBox'
 export default function HomePage() {
   return (
     <Shell>
-      <div className="grid gap-4" style={{ gridTemplateColumns: '340px minmax(0, 1fr) 340px' }}>
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-[340px_minmax(0,1fr)_340px]">
 
         {/* Left column — Operator · Key Blockers · Whoop */}
         <div className="flex flex-col gap-4 min-w-0">

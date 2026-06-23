@@ -189,7 +189,7 @@ export default function WeeklyReviewPage() {
             LOADING WEEK…
           </div>
         ) : (
-          <div className="grid gap-4" style={{ gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)' }}>
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
 
             {/* WINS */}
             <Panel index={1} title={`Wins · ${wins.length}`} status={wins.length ? 'online' : 'none'}>

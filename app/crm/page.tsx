@@ -563,8 +563,8 @@ export default function CRMPage() {
     const isActive = quickColId === colId
     return (
       <div
-        className="flex flex-col gap-2 group/col"
-        style={{ flex: '1 1 0', minWidth: wide ? 160 : 140, opacity: isPast ? 0.55 : 1 }}
+        className="flex flex-col gap-2 group/col w-full md:w-auto"
+        style={{ flex: '1 1 0', minWidth: wide ? 160 : 0, opacity: isPast ? 0.55 : 1 }}
       >
         <ColHeader label={label} sub={sub} count={taskList.length} color={color} accent={accent} />
         <div className="flex flex-col gap-1.5 overflow-y-auto flex-1">
@@ -805,53 +805,52 @@ export default function CRMPage() {
         )
       })()}
 
-      <div className="flex gap-4 h-[calc(100vh-64px)]">
+      <div className="flex flex-col md:flex-row gap-4 md:h-[calc(100vh-64px)]">
 
         {/* Main area */}
         <div className="flex-1 flex flex-col gap-3 overflow-hidden min-w-0">
 
           {/* Header */}
           <Panel>
-            <div className="flex items-center gap-3 flex-wrap">
-              {/* View tabs */}
-              <div className="flex gap-1">
-                {(['kanban', 'smart'] as View[]).map(v => (
-                  <button key={v} onClick={() => setViewPersist(v)}
-                    className="px-3 py-1 rounded-md text-xs font-medium capitalize transition-colors"
-                    style={{
-                      background: view === v ? 'var(--accent-dim)' : 'transparent',
-                      color: view === v ? 'var(--accent)' : 'var(--ink-4)',
-                    }}>{v}</button>
-                ))}
+            <div className="flex flex-col gap-2">
+              {/* Top row: view tabs + prioritize */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex gap-1">
+                  {(['kanban', 'smart'] as View[]).map(v => (
+                    <button key={v} onClick={() => setViewPersist(v)}
+                      className="px-3 py-1 rounded-md text-xs font-medium capitalize transition-colors"
+                      style={{
+                        background: view === v ? 'var(--accent-dim)' : 'transparent',
+                        color: view === v ? 'var(--accent)' : 'var(--ink-4)',
+                      }}>{v}</button>
+                  ))}
+                </div>
+
+                {view === 'kanban' && (
+                  rankById ? (
+                    <button onClick={clearPrioritize}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors"
+                      style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}>
+                      ✦ Prioritized · clear
+                    </button>
+                  ) : (
+                    <button onClick={prioritizeDay} disabled={prioritizing}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all hover:brightness-110 disabled:opacity-50"
+                      style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}>
+                      {prioritizing ? '✦ Thinking…' : '✦ Prioritize My Day'}
+                    </button>
+                  )
+                )}
               </div>
 
-              {/* Prioritize My Day */}
-              {view === 'kanban' && (
-                rankById ? (
-                  <button onClick={clearPrioritize}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors"
-                    style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}>
-                    ✦ Prioritized · clear
-                  </button>
-                ) : (
-                  <button onClick={prioritizeDay} disabled={prioritizing}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all hover:brightness-110 disabled:opacity-50"
-                    style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)' }}>
-                    {prioritizing ? '✦ Thinking…' : '✦ Prioritize My Day'}
-                  </button>
-                )
-              )}
-
-              <div className="flex-1" />
-
-              {/* Add task form */}
+              {/* Add task form — wraps on mobile */}
               <div className="flex items-center gap-2 flex-wrap">
                 <input
                   value={newTitle}
                   onChange={e => setNewTitle(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && addTask()}
                   placeholder="New task…"
-                  className="text-xs px-3 py-1.5 rounded-lg outline-none w-44"
+                  className="text-xs px-3 py-1.5 rounded-lg outline-none w-full sm:w-44"
                   style={{ background: 'var(--ink-2)', border: '1px solid oklch(1 0 0 / 0.08)', color: 'var(--foreground)' }}
                 />
 
@@ -888,7 +887,7 @@ export default function CRMPage() {
                 </div>
 
                 <button onClick={() => setNewKey(k => !k)}
-                  className="text-xs px-2 py-1.5 rounded-lg transition-colors"
+                  className="text-xs px-2 py-1.5 rounded-lg transition-colors min-h-[36px]"
                   style={{
                     background: newKey ? 'oklch(0.65 0.22 20 / 0.2)' : 'var(--ink-2)',
                     color: newKey ? 'var(--danger)' : 'var(--ink-4)',
@@ -896,7 +895,7 @@ export default function CRMPage() {
                   }}>★</button>
 
                 <button onClick={() => addTask()} disabled={adding || !newTitle.trim()}
-                  className="text-xs px-3 py-1.5 rounded-lg font-medium disabled:opacity-40"
+                  className="text-xs px-3 py-1.5 rounded-lg font-medium disabled:opacity-40 min-h-[36px]"
                   style={{ background: 'var(--accent)', color: 'var(--ink-0)' }}>Add</button>
               </div>
             </div>
@@ -905,12 +904,12 @@ export default function CRMPage() {
           {/* ── Kanban ─────────────────────────────────────────────────────── */}
           {view === 'kanban' && (
             <div className="flex-1 overflow-hidden">
-              <div className="flex w-full h-full overflow-x-auto pb-2 gap-3">
+              <div className="flex flex-col md:flex-row md:w-full md:h-full md:overflow-x-auto pb-2 gap-3">
 
                 {/* ── Overdue (conditional) ── */}
                 {overdueTasks.length > 0 && (
                   <>
-                    <div className="flex flex-col gap-2" style={{ flex: '1 1 0', minWidth: 140 }}>
+                    <div className="flex flex-col gap-2 w-full md:w-auto" style={{ flex: '1 1 0' }}>
                       <ColHeader label="Overdue" sub="Past due" count={overdueTasks.length}
                         color={COL_COLORS.overdue} />
                       <div className="flex flex-col gap-1.5 overflow-y-auto flex-1">
@@ -942,7 +941,7 @@ export default function CRMPage() {
                 <div className="w-px shrink-0 self-stretch" style={{ background: 'oklch(1 0 0 / 0.06)' }} />
 
                 {/* ── This Week (clickable → expands to overlay) ── */}
-                <div className="flex flex-col gap-2 group/week" style={{ flex: '1 1 0', minWidth: 140 }}>
+                <div className="flex flex-col gap-2 group/week w-full md:w-auto" style={{ flex: '1 1 0' }}>
                   {/* Clickable header */}
                   <button
                     onClick={() => setWeekOpen(true)}
@@ -1069,9 +1068,17 @@ export default function CRMPage() {
 
         </div>
 
-        {/* ── Side drawer ────────────────────────────────────────────────────── */}
+        {/* ── Side drawer — bottom sheet on mobile, sidebar on desktop ── */}
         {selected && (
-          <div className="w-72 shrink-0 flex flex-col gap-3 overflow-y-auto">
+          <>
+            {/* Mobile backdrop */}
+            <div className="md:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setSelected(null)} />
+          </>
+        )}
+        {selected && (
+          <div className="fixed bottom-0 inset-x-0 z-50 md:static md:z-auto w-full md:w-72 md:shrink-0 flex flex-col gap-3 overflow-y-auto max-h-[80vh] md:max-h-none rounded-t-2xl md:rounded-none"
+            style={{ background: 'var(--bg)' }}
+          >
             <Panel className="flex-1">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-mono font-semibold uppercase tracking-widest" style={{ color: 'var(--ink-4)' }}>

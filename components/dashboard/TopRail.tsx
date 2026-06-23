@@ -5,6 +5,8 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 
+
+
 const TABS = [
   { label: 'HOME', href: '/' },
   { label: 'LOG', href: '/log' },
@@ -87,6 +89,7 @@ export function TopRail() {
   const prices = useLivePrices()
   const [time, setTime] = useState('')
   const [dateStr, setDateStr] = useState('')
+  const [mobileOpen, setMobileOpen] = useState(false)
 
   useEffect(() => {
     function tick() {
@@ -99,6 +102,14 @@ export function TopRail() {
     return () => clearInterval(id)
   }, [])
 
+  // Close mobile menu on route change or resize to desktop
+  useEffect(() => { setMobileOpen(false) }, [pathname])
+  useEffect(() => {
+    function onResize() { if (window.innerWidth >= 1024) setMobileOpen(false) }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' })
     window.location.href = '/login'
@@ -109,7 +120,7 @@ export function TopRail() {
 
   return (
     <header
-      className="sticky top-0 z-50"
+      className="sticky top-0 z-50 relative"
       style={{
         background: 'oklch(0.10 0.008 255 / 0.96)',
         backdropFilter: 'blur(16px)',
@@ -129,8 +140,8 @@ export function TopRail() {
           <span className="text-[10px] dot-online" style={{ fontFamily: 'var(--font-mono)', color: 'var(--ok)' }}>●</span>
         </div>
 
-        {/* Nav tabs */}
-        <nav className="flex items-center gap-0.5">
+        {/* Nav tabs — desktop only */}
+        <nav className="hidden lg:flex items-center gap-0.5">
           {TABS.map((tab, i) => {
             const active = tab.href === '/' ? pathname === '/' : pathname.startsWith(tab.href)
             return (
@@ -159,9 +170,10 @@ export function TopRail() {
           })}
         </nav>
 
-        {/* Clock + avatar */}
-        <div className="flex items-center gap-3">
-          <div className="text-right">
+        {/* Right side: clock + hamburger + avatar */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Clock — hidden on mobile */}
+          <div className="hidden sm:block text-right">
             <div
               className="text-xs font-semibold tabular-nums"
               style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg)', letterSpacing: '0.05em' }}
@@ -175,13 +187,66 @@ export function TopRail() {
               {dateStr}
             </div>
           </div>
+
+          {/* Hamburger — mobile only */}
+          <button
+            onClick={() => setMobileOpen(o => !o)}
+            className="lg:hidden flex items-center justify-center w-10 h-10 rounded-md transition-all"
+            style={{
+              color: mobileOpen ? 'var(--accent)' : 'var(--fg-3)',
+              background: mobileOpen ? 'var(--accent-dim)' : 'transparent',
+            }}
+            aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+          >
+            <div className="flex flex-col gap-[5px] w-4">
+              <div className="h-px w-full" style={{ background: 'currentColor' }} />
+              <div className="h-px w-full" style={{ background: 'currentColor' }} />
+              <div className="h-px w-full" style={{ background: 'currentColor' }} />
+            </div>
+          </button>
+
           <AvatarButton onClick={handleLogout} />
         </div>
       </div>
 
-      {/* Ticker rail */}
+      {/* Mobile nav dropdown */}
+      {mobileOpen && (
+        <div
+          className="lg:hidden absolute top-10 inset-x-0 z-50"
+          style={{
+            background: 'oklch(0.10 0.008 255 / 0.98)',
+            backdropFilter: 'blur(20px)',
+            borderBottom: '1px solid var(--border)',
+            boxShadow: '0 8px 32px oklch(0 0 0 / 0.5)',
+          }}
+        >
+          <nav className="grid grid-cols-3 gap-1 p-3">
+            {TABS.map((tab) => {
+              const active = tab.href === '/' ? pathname === '/' : pathname.startsWith(tab.href)
+              return (
+                <Link
+                  key={tab.href}
+                  href={tab.href}
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center justify-center py-3 rounded-md text-[10px] font-medium tracking-wider transition-colors"
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    background: active ? 'var(--accent-dim)' : 'transparent',
+                    color: active ? 'var(--accent)' : 'var(--fg-3)',
+                    border: active ? '1px solid var(--accent-glow)' : '1px solid transparent',
+                  }}
+                >
+                  {tab.label}
+                </Link>
+              )
+            })}
+          </nav>
+        </div>
+      )}
+
+      {/* Ticker rail — hidden on mobile */}
       <div
-        className="relative overflow-hidden h-5 flex items-center"
+        className="hidden md:flex relative overflow-hidden h-5 items-center"
         style={{ borderTop: '1px solid var(--border)' }}
       >
         {/* Fade edges */}

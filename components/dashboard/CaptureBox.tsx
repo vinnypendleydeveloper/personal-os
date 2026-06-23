@@ -68,7 +68,7 @@ export function CaptureBox() {
       className="fixed bottom-5 left-1/2 z-50 transition-all duration-300 ease-out"
       style={{
         transform: 'translateX(-50%)',
-        width: expanded ? '520px' : '300px',
+        width: expanded ? 'min(520px, calc(100vw - 32px))' : 'min(300px, calc(100vw - 32px))',
       }}
     >
       {/* Toast notification */}
