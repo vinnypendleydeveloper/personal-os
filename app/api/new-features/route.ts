@@ -16,7 +16,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  const { title, notes, when_to_add, sort_order, category, effort } = body
+  const { title, notes, when_to_add, sort_order, category, effort, priority } = body
   if (!title?.trim()) return NextResponse.json({ error: 'title required' }, { status: 400 })
 
   const db = getServiceClient()
@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
       is_expanded: true,
       category: category || null,
       effort: effort || null,
+      priority: priority || null,
     })
     .select()
     .single()
@@ -61,7 +62,7 @@ export async function PATCH(req: NextRequest) {
   const { id, ...fields } = body
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
-  const allowed = ['is_expanded', 'category', 'effort', 'title', 'notes', 'when_to_add', 'sort_order']
+  const allowed = ['is_expanded', 'category', 'effort', 'title', 'notes', 'when_to_add', 'sort_order', 'priority']
   const update = Object.fromEntries(
     Object.entries(fields).filter(([k]) => allowed.includes(k))
   )
