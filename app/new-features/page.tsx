@@ -19,6 +19,8 @@ interface Feature {
   category: string | null
   effort: string | null
   priority: string | null
+  completed_at: string | null
+  completion_summary: string | null
 }
 
 interface Suggestion {
@@ -158,6 +160,8 @@ interface CardProps {
   onToggleExpand: (id: string, next: boolean) => void
   onDelete: (id: string) => void
   onUpdateField: (id: string, field: string, value: string | boolean | null) => void
+  onComplete: (id: string) => void
+  isCompleting: boolean
   animIdx: number
 }
 
@@ -172,6 +176,8 @@ function FeatureCard({
   onToggleExpand,
   onDelete,
   onUpdateField,
+  onComplete,
+  isCompleting,
   animIdx,
 }: CardProps) {
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -197,6 +203,43 @@ function FeatureCard({
           cursor: isDragging ? 'grabbing' : 'default',
         }}
       >
+        {/* Complete checkbox */}
+        <button
+          onClick={() => onComplete(feature.id)}
+          disabled={isCompleting}
+          title="Mark as complete"
+          style={{
+            width: 16,
+            height: 16,
+            borderRadius: '50%',
+            border: '1.5px solid var(--border-2)',
+            background: 'transparent',
+            cursor: isCompleting ? 'default' : 'pointer',
+            flexShrink: 0,
+            marginTop: 2,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'border-color 150ms ease, background 150ms ease',
+            color: 'var(--ok)',
+            fontSize: 9,
+            opacity: isCompleting ? 0.4 : 1,
+          }}
+          className="opacity-0 group-hover:opacity-100"
+          onMouseEnter={e => {
+            if (!isCompleting) {
+              (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--ok)'
+              ;(e.currentTarget as HTMLButtonElement).style.background = 'var(--ok-dim)'
+            }
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-2)'
+            ;(e.currentTarget as HTMLButtonElement).style.background = 'transparent'
+          }}
+        >
+          {isCompleting ? '' : '✓'}
+        </button>
+
         {/* Drag handle */}
         <div
           style={{
@@ -456,6 +499,10 @@ export default function NewFeaturesPage() {
   const [nextRec, setNextRec] = useState<string | null>(null)
   const [loadingNext, setLoadingNext] = useState(false)
 
+  // Tab + completion state
+  const [activeTab, setActiveTab] = useState<'backlog' | 'completed'>('backlog')
+  const [completingId, setCompletingId] = useState<string | null>(null)
+
   // Drag-and-drop state
   const dragSrcRef = useRef<number | null>(null)
   const [dropIdx, setDropIdx] = useState<number | null>(null)
@@ -475,8 +522,12 @@ export default function NewFeaturesPage() {
     setLoading(false)
   }
 
-  // Filtered view (client-side)
-  const displayed = features.filter(f => {
+  // Split backlog vs completed
+  const backlogFeatures = features.filter(f => !f.completed_at)
+  const completedFeatures = features.filter(f => !!f.completed_at)
+
+  // Filtered view (client-side, backlog only)
+  const displayed = backlogFeatures.filter(f => {
     if (filterPriority && f.priority !== filterPriority) return false
     if (filterCategory && f.category !== filterCategory) return false
     if (filterEffort && f.effort !== filterEffort) return false
@@ -571,6 +622,22 @@ export default function NewFeaturesPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, [field]: value }),
     })
+  }
+
+  async function markComplete(id: string) {
+    setCompletingId(id)
+    try {
+      const res = await fetch('/api/new-features/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      const data = await res.json()
+      if (data.feature) {
+        setFeatures(prev => prev.map(f => f.id === id ? data.feature : f))
+      }
+    } catch {}
+    setCompletingId(null)
   }
 
   async function persistOrder(ordered: Feature[]) {
@@ -910,8 +977,34 @@ export default function NewFeaturesPage() {
             </div>
           )}
 
+          {/* Tab toggle */}
+          {!loading && (
+            <div style={{ display: 'flex', gap: 4, paddingBottom: 2 }}>
+              {(['backlog', 'completed'] as const).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className="card-label"
+                  style={{
+                    padding: '3px 10px',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                    transition: 'all 120ms ease',
+                    ...(activeTab === tab
+                      ? { color: 'var(--fg)', background: 'var(--bg-3)', border: '1px solid var(--border-2)' }
+                      : { color: 'var(--fg-4)', background: 'transparent', border: '1px dashed var(--border)' }),
+                  }}
+                >
+                  {tab === 'backlog'
+                    ? `BACKLOG${backlogFeatures.length > 0 ? ` (${backlogFeatures.length})` : ''}`
+                    : `COMPLETED${completedFeatures.length > 0 ? ` (${completedFeatures.length})` : ''}`}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Filter bar */}
-          {!loading && features.length > 0 && (
+          {!loading && activeTab === 'backlog' && backlogFeatures.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, paddingBottom: 4 }}>
               <span className="card-label" style={{ color: 'var(--fg-4)', alignSelf: 'center', marginRight: 2 }}>filter</span>
 
@@ -971,12 +1064,12 @@ export default function NewFeaturesPage() {
             </div>
           )}
 
-          {/* Board */}
-          {loading ? (
+          {/* Board — Backlog tab */}
+          {activeTab === 'backlog' && (loading ? (
             <p className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)' }}>
               Loading…
             </p>
-          ) : features.length === 0 ? (
+          ) : backlogFeatures.length === 0 ? (
             <p className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)' }}>
               No features queued. Add one above.
             </p>
@@ -1006,6 +1099,8 @@ export default function NewFeaturesPage() {
                     onToggleExpand={toggleExpand}
                     onDelete={removeFeature}
                     onUpdateField={updateField}
+                    onComplete={markComplete}
+                    isCompleting={completingId === f.id}
                   />
                 ))
               )}
@@ -1032,10 +1127,77 @@ export default function NewFeaturesPage() {
                 />
               )}
             </div>
+          ))}
+
+          {/* Completed tab */}
+          {!loading && activeTab === 'completed' && (
+            completedFeatures.length === 0 ? (
+              <p className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)' }}>
+                No completed features yet.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {completedFeatures.map((f, i) => (
+                  <div
+                    key={f.id}
+                    className="panel animate-fade-up"
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 8,
+                      padding: '10px 12px',
+                      animationDelay: `${i * 35}ms`,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-sans)',
+                          fontSize: 13,
+                          fontWeight: 500,
+                          color: 'var(--fg-3)',
+                          textDecoration: 'line-through',
+                          flex: 1,
+                        }}
+                      >
+                        {f.title}
+                      </span>
+                      {f.completed_at && (
+                        <span className="card-label" style={{ color: 'var(--ok)', background: 'var(--ok-dim)', border: '1px solid oklch(0.74 0.17 148 / 0.25)', padding: '2px 7px', borderRadius: 4 }}>
+                          ✓ {formatDate(f.completed_at)}
+                        </span>
+                      )}
+                    </div>
+                    {f.completion_summary && (
+                      <textarea
+                        readOnly
+                        value={f.completion_summary}
+                        rows={3}
+                        onClick={e => (e.target as HTMLTextAreaElement).select()}
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 11,
+                          color: 'var(--fg-2)',
+                          background: 'var(--bg-2)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 6,
+                          padding: '8px 10px',
+                          lineHeight: 1.65,
+                          resize: 'none',
+                          outline: 'none',
+                          cursor: 'text',
+                          width: '100%',
+                        }}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )
           )}
 
           {/* "What should I build next?" */}
-          {!loading && features.length > 0 && (
+          {!loading && activeTab === 'backlog' && backlogFeatures.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <button
